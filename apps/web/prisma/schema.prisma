@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Local PoC: SQLite (no Docker). Switch to postgresql when Docker infra is ready.
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CAPTAIN
+}
+
+enum CourseStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String
+  passwordHash String
+  role         Role         @default(CAPTAIN)
+  active       Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  assignments  Assignment[]
+  progress     WatchProgress[]
+  watchEvents  WatchEvent[]
+  quizAttempts QuizAttempt[]
+}
+
+model Course {
+  id           String       @id @default(cuid())
+  title        String
+  description  String
+  passPercent  Int          @default(80)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  video        Video?
+  questions    Question[]
+  assignments  Assignment[]
+  progress     WatchProgress[]
+  quizAttempts QuizAttempt[]
+}
+
+model Video {
+  id           String   @id @default(cuid())
+  courseId     String   @unique
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  storageKey   String
+  fileName     String
+  contentType  String   @default("video/mp4")
+  durationSec  Int
+  sizeBytes    Int      @default(0)
+  createdAt    DateTime @default(now())
+  watchEvents  WatchEvent[]
+}
+
+model Question {
+  id        String   @id @default(cuid())
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  prompt    String
+  sortOrder Int      @default(0)
+  choices   Choice[]
+}
+
+model Choice {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String
+  isCorrect  Boolean  @default(false)
+}
+
+model Assignment {
+  id         String   @id @default(cuid())
+  userId     String
+  courseId   String
+  assignedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+}
+
+model WatchProgress {
+  id             String       @id @default(cuid())
+  userId         String
+  courseId       String
+  positionSec    Float        @default(0)
+  maxReachedSec  Float        @default(0)
+  watchedPercent Float        @default(0)
+  completed      Boolean      @default(false)
+  status         CourseStatus @default(NOT_STARTED)
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course         Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+}
+
+model WatchEvent {
+  id          String   @id @default(cuid())
+  userId      String
+  videoId     String
+  eventType   String
+  positionSec Float
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video       Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([videoId, createdAt])
+}
+
+model QuizAttempt {
+  id            String   @id @default(cuid())
+  userId        String
+  courseId      String
+  attemptNo     Int
+  scorePercent  Float
+  correctCount  Int
+  wrongCount    Int
+  passed        Boolean
+  answersJson   String
+  completedAt   DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId, courseId])
+}
