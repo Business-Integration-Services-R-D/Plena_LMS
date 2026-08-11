@@ -8,6 +8,10 @@ type Quiz = {
   courseId: string;
   title: string;
   passPercent: number;
+  maxAttempts: number;
+  attemptNo: number;
+  durationMinutes: number | null;
+  retakePolicy: string;
   questions: {
     id: string;
     prompt: string;
@@ -24,6 +28,9 @@ type Result = {
     wrongCount: number;
   };
   passPercent: number;
+  maxAttempts: number;
+  attemptsLeft: number | null;
+  mustRewatchVideo: boolean;
 };
 
 export default function QuizPage() {
@@ -34,7 +41,7 @@ export default function QuizPage() {
   const [result, setResult] = useState<Result | null>(null);
 
   useEffect(() => {
-    void fetch(`/api/captain/courses/${params.id}/quiz`)
+    void fetch(`/api/user/courses/${params.id}/quiz`)
       .then(async (res) => {
         if (!res.ok) throw new Error((await res.json()).error || "Test açılamadı");
         return res.json();
@@ -56,7 +63,7 @@ export default function QuizPage() {
       setError("Tüm soruları cevaplayın");
       return;
     }
-    const res = await fetch(`/api/captain/courses/${params.id}/quiz`, {
+    const res = await fetch(`/api/user/courses/${params.id}/quiz`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -73,7 +80,7 @@ export default function QuizPage() {
     return (
       <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-800">
         <p>{error}</p>
-        <Link href={`/captain/courses/${params.id}`} className="mt-3 inline-block underline">
+        <Link href={`/user/courses/${params.id}`} className="mt-3 inline-block underline">
           Videoya dön
         </Link>
       </div>
@@ -95,12 +102,31 @@ export default function QuizPage() {
         <p className="mt-2 text-sm text-sea-600">
           Deneme #{result.attempt.attemptNo} · {result.attempt.correctCount} doğru /{" "}
           {result.attempt.wrongCount} yanlış · baraj %{result.passPercent}
+          {result.attemptsLeft !== null
+            ? ` · kalan hak: ${result.attemptsLeft}`
+            : ""}
         </p>
+
+        {result.mustRewatchVideo ? (
+          <p className="mt-3 rounded-xl bg-amber-50 px-4 py-2 text-sm text-amber-800">
+            Bu eğitimin tekrar kuralı gereği yeniden teste girmeden önce videoyu
+            baştan izlemeniz gerekiyor.
+          </p>
+        ) : null}
+
         <div className="mt-5 flex gap-2">
-          <Link href="/captain" className="rounded-xl bg-sea-700 px-4 py-2 text-white">
+          <Link href="/user" className="rounded-xl bg-sea-700 px-4 py-2 text-white">
             Eğitimlerime dön
           </Link>
-          {!result.attempt.passed ? (
+          {!result.attempt.passed && result.mustRewatchVideo ? (
+            <Link
+              href={`/user/courses/${params.id}`}
+              className="rounded-xl border border-sea-200 px-4 py-2"
+            >
+              Videoyu baştan izle
+            </Link>
+          ) : null}
+          {!result.attempt.passed && !result.mustRewatchVideo ? (
             <button
               type="button"
               className="rounded-xl border border-sea-200 px-4 py-2"
@@ -122,7 +148,11 @@ export default function QuizPage() {
     <form onSubmit={onSubmit} className="space-y-5">
       <section className="rounded-3xl border border-sea-200 bg-white p-5">
         <h2 className="text-xl font-semibold">{quiz.title} — Test</h2>
-        <p className="mt-1 text-sm text-sea-600">Geçme barajı: %{quiz.passPercent}</p>
+        <p className="mt-1 text-sm text-sea-600">
+          Geçme barajı: %{quiz.passPercent} · Deneme #{quiz.attemptNo}
+          {quiz.maxAttempts > 0 ? ` / ${quiz.maxAttempts}` : ""}
+          {quiz.durationMinutes ? ` · süre ${quiz.durationMinutes} dk` : ""}
+        </p>
       </section>
 
       {quiz.questions.map((q, idx) => (

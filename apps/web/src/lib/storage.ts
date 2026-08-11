@@ -1,5 +1,5 @@
-import { createWriteStream } from "fs";
-import { mkdir, readFile, writeFile } from "fs/promises";
+import { createReadStream, createWriteStream } from "fs";
+import { mkdir, readFile, stat, writeFile } from "fs/promises";
 import path from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
@@ -7,9 +7,11 @@ import {
   CreateBucketCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import type { ByteRange } from "./range";
 
 function env(name: string, fallback?: string) {
   const value = process.env[name] ?? fallback;
@@ -142,4 +144,41 @@ export async function readObject(key: string): Promise<Buffer> {
   );
   if (!obj.Body) throw new Error("Video okunamadı");
   return Buffer.from(await obj.Body.transformToByteArray());
+}
+
+/** Dosyanın gerçek boyutu. Range yanıtları için gerekli. */
+export async function statObject(key: string): Promise<{ size: number }> {
+  if (storageDriver() === "local") {
+    const info = await stat(localPath(key));
+    return { size: info.size };
+  }
+
+  const head = await getS3Client().send(
+    new HeadObjectCommand({ Bucket: bucketName(), Key: key }),
+  );
+  return { size: head.ContentLength ?? 0 };
+}
+
+/**
+ * Dosyayı (veya verilen byte aralığını) akış olarak okur.
+ * Tüm videoyu belleğe almadan servis edebilmek için kullanılır.
+ */
+export async function readObjectStream(
+  key: string,
+  range?: ByteRange,
+): Promise<ReadableStream<Uint8Array>> {
+  if (storageDriver() === "local") {
+    const nodeStream = createReadStream(localPath(key), range);
+    return Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+  }
+
+  const obj = await getS3Client().send(
+    new GetObjectCommand({
+      Bucket: bucketName(),
+      Key: key,
+      Range: range ? `bytes=${range.start}-${range.end}` : undefined,
+    }),
+  );
+  if (!obj.Body) throw new Error("Video okunamadı");
+  return obj.Body.transformToWebStream();
 }

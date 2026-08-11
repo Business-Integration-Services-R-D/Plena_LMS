@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 
+type WatchEvent = "HEARTBEAT" | "PAUSE" | "SEEK_BLOCKED" | "EXIT" | "COMPLETE";
+
 type Props = {
   courseId: string;
   src: string;
@@ -21,6 +23,7 @@ export function VideoPlayer({
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const maxRef = useRef(maxReachedSec);
+  const completedRef = useRef(false);
   const [watchedPercent, setWatchedPercent] = useState(
     Math.min(100, (maxReachedSec / Math.max(durationSec, 1)) * 100),
   );
@@ -45,20 +48,28 @@ export function VideoPlayer({
     const video = videoRef.current;
     if (!video) return;
 
-    const sendProgress = async (eventType: "HEARTBEAT" | "END") => {
-      await fetch(`/api/captain/courses/${courseId}/progress`, {
+    const sendProgress = async (eventType: WatchEvent, positionSec?: number) => {
+      await fetch(`/api/user/courses/${courseId}/progress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          positionSec: video.currentTime,
+          positionSec: positionSec ?? video.currentTime,
           eventType,
         }),
       });
     };
 
+    const markCompleted = () => {
+      if (completedRef.current) return;
+      completedRef.current = true;
+      maxRef.current = Math.max(maxRef.current, video.duration || durationSec);
+      setWatchedPercent(100);
+      onCompleted();
+      void sendProgress("COMPLETE", maxRef.current);
+    };
+
     const onTimeUpdate = () => {
       if (video.currentTime > maxRef.current + 0.35) {
-        // Block forward seek
         video.currentTime = maxRef.current;
         setMessage("İleri sarma engellendi — eğitimi sırayla izlemelisiniz.");
         return;
@@ -66,29 +77,30 @@ export function VideoPlayer({
       if (video.currentTime > maxRef.current) {
         maxRef.current = video.currentTime;
       }
-      const pct = Math.min(100, (maxRef.current / Math.max(durationSec, 1)) * 100);
+      // Gerçek video süresi, kaydedilen tam sayı süreden kısa olabilir; bu yüzden
+      // yüzdeyi oynatıcının bildirdiği süreye göre hesaplıyoruz.
+      const total = Math.max(video.duration || durationSec, 1);
+      const pct = Math.min(100, (maxRef.current / total) * 100);
       setWatchedPercent(pct);
-      if (pct >= 99.5) onCompleted();
+      if (total - maxRef.current <= 0.5) markCompleted();
     };
 
     const onSeeking = () => {
       if (video.currentTime > maxRef.current + 0.35) {
         video.currentTime = maxRef.current;
         setMessage("İleri sarma engellendi — eğitimi sırayla izlemelisiniz.");
+        void sendProgress("SEEK_BLOCKED");
       }
     };
 
     const interval = setInterval(() => {
       if (!video.paused) void sendProgress("HEARTBEAT");
-    }, 4000);
+    }, 2000);
 
-    const onPause = () => void sendProgress("HEARTBEAT");
-    const onEnded = () => {
-      maxRef.current = durationSec;
-      setWatchedPercent(100);
-      onCompleted();
-      void sendProgress("END");
+    const onPause = () => {
+      if (!completedRef.current) void sendProgress("PAUSE");
     };
+    const onEnded = () => markCompleted();
 
     video.addEventListener("timeupdate", onTimeUpdate);
     video.addEventListener("seeking", onSeeking);
@@ -100,7 +112,7 @@ export function VideoPlayer({
       video.removeEventListener("seeking", onSeeking);
       video.removeEventListener("pause", onPause);
       video.removeEventListener("ended", onEnded);
-      void sendProgress("HEARTBEAT");
+      void sendProgress("EXIT");
     };
   }, [courseId, durationSec, onCompleted]);
 

@@ -32,7 +32,7 @@ export default function AdminUsersPage() {
     const res = await fetch("/api/admin/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email, password, role: "CAPTAIN" }),
+      body: JSON.stringify({ name, email, password, role: "USER" }),
     });
     if (!res.ok) {
       const data = await res.json();
@@ -92,7 +92,7 @@ export default function AdminUsersPage() {
       </section>
 
       <section className="rounded-3xl border border-sea-200 bg-white p-5">
-        <h2 className="text-lg font-semibold">Yeni kaptan</h2>
+        <h2 className="text-lg font-semibold">Yeni kullanıcı</h2>
         <form onSubmit={onCreate} className="mt-4 space-y-3">
           <input
             className="w-full rounded-xl border border-sea-200 px-3 py-2"

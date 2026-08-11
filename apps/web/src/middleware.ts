@@ -12,13 +12,13 @@ function secretKey() {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const isAdmin = pathname.startsWith("/admin");
-  const isCaptain = pathname.startsWith("/captain");
+  const isUserArea = pathname.startsWith("/user");
   const isProtectedApi =
     pathname.startsWith("/api/") &&
     !pathname.startsWith("/api/auth/login") &&
     !pathname.startsWith("/api/health");
 
-  if (!isAdmin && !isCaptain && !isProtectedApi) {
+  if (!isAdmin && !isUserArea && !isProtectedApi) {
     return NextResponse.next();
   }
 
@@ -35,9 +35,9 @@ export async function middleware(req: NextRequest) {
     const role = String(payload.role);
 
     if (isAdmin && role !== "ADMIN") {
-      return NextResponse.redirect(new URL("/captain", req.url));
+      return NextResponse.redirect(new URL("/user", req.url));
     }
-    if (isCaptain && role !== "CAPTAIN" && role !== "ADMIN") {
+    if (isUserArea && role !== "USER" && role !== "ADMIN") {
       return NextResponse.redirect(new URL("/login", req.url));
     }
     if (pathname.startsWith("/api/admin") && role !== "ADMIN") {
@@ -54,5 +54,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/captain/:path*", "/api/:path*"],
+  matcher: ["/admin/:path*", "/user/:path*", "/api/:path*"],
 };

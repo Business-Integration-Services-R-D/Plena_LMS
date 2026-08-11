@@ -23,7 +23,7 @@ export default function CoursePlayPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    void fetch(`/api/captain/courses/${params.id}/play`)
+    void fetch(`/api/user/courses/${params.id}/play`)
       .then(async (res) => {
         if (!res.ok) throw new Error((await res.json()).error || "Yüklenemedi");
         return res.json();
@@ -67,7 +67,7 @@ export default function CoursePlayPage() {
               Video tamamlandı. Şimdi başarı testine geçebilirsiniz (baraj %{data.course.passPercent}).
             </p>
             <Link
-              href={`/captain/courses/${data.course.id}/quiz`}
+              href={`/user/courses/${data.course.id}/quiz`}
               className="rounded-xl bg-sea-700 px-4 py-2 text-white"
             >
               Teste başla

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Role } from "@prisma/client";
+import { AuditAction, Role } from "@prisma/client";
 import { z } from "zod";
 import { hashPassword, requireSession } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
@@ -26,7 +27,7 @@ const createSchema = z.object({
   email: z.string().email(),
   name: z.string().min(2),
   password: z.string().min(6),
-  role: z.enum(["ADMIN", "CAPTAIN"]).default("CAPTAIN"),
+  role: z.enum(["ADMIN", "USER"]).default("USER"),
 });
 
 export async function POST(req: NextRequest) {
@@ -49,6 +50,15 @@ export async function POST(req: NextRequest) {
       },
       select: { id: true, email: true, name: true, role: true, active: true },
     });
+
+    await recordAudit({
+      action: AuditAction.ADMIN_CREATED_USER,
+      actor: session,
+      entityType: "User",
+      entityId: user.id,
+      metadata: { email: user.email, role: user.role },
+    });
+
     return NextResponse.json(user, { status: 201 });
   } catch {
     return NextResponse.json({ error: "E-posta zaten kayıtlı" }, { status: 409 });

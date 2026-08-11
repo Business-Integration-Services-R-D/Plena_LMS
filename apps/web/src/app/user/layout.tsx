@@ -2,19 +2,19 @@ import { redirect } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
 
-export default async function CaptainLayout({
+export default async function UserLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await requireSession(["CAPTAIN", "ADMIN"]);
+  const session = await requireSession(["USER", "ADMIN"]);
   if (!session) redirect("/login");
 
   return (
     <AppShell
       user={session}
       nav={[
-        { href: "/captain", label: "Eğitimlerim" },
+        { href: "/user", label: "Eğitimlerim" },
       ]}
     >
       {children}

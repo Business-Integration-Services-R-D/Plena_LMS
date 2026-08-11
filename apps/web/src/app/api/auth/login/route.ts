@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { AuditAction } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { recordAudit } from "@/lib/audit";
 import { createSession, verifyPassword } from "@/lib/auth";
 
 const schema = z.object({
@@ -32,6 +34,14 @@ export async function POST(req: NextRequest) {
     email: user.email,
     name: user.name,
     role: user.role,
+  });
+
+  await recordAudit({
+    action: AuditAction.USER_LOGGED_IN,
+    actor: user,
+    entityType: "User",
+    entityId: user.id,
+    metadata: { role: user.role },
   });
 
   return NextResponse.json({

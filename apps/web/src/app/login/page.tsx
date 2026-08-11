@@ -26,7 +26,7 @@ export default function LoginPage() {
       return;
     }
     const data = await res.json();
-    router.push(data.role === "ADMIN" ? "/admin" : "/captain");
+    router.push(data.role === "ADMIN" ? "/admin" : "/user");
     router.refresh();
   }
 
@@ -36,7 +36,7 @@ export default function LoginPage() {
         <p className="text-xs uppercase tracking-[0.2em] text-sea-500">Martı Denizcilik</p>
         <h1 className="mt-2 text-2xl font-semibold text-sea-950">Cloud LMS PoC</h1>
         <p className="mt-2 text-sm text-sea-600">
-          Demo hesaplarla giriş yapın. Kaptan: zorunlu izleme + test. Admin: rapor ve içerik.
+          Demo hesaplarla giriş yapın. Kullanıcı: zorunlu izleme + test. Admin: rapor ve içerik.
         </p>
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <label className="block text-sm">
