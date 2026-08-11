@@ -1,9 +1,17 @@
 "use server";
 
-import { Role } from "@prisma/client";
+import { revalidatePath } from "next/cache";
+import { AuditAction, RetakePolicy, Role } from "@prisma/client";
 import { requireSession } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { sanitizeStorageKeyPart, uploadFileObject } from "@/lib/storage";
+
+function parseRetakePolicy(value: FormDataEntryValue | null): RetakePolicy {
+  return value === RetakePolicy.VIDEO_AND_TEST
+    ? RetakePolicy.VIDEO_AND_TEST
+    : RetakePolicy.TEST_ONLY;
+}
 
 export type CreateCourseResult =
   | { ok: true; id: string }
@@ -19,7 +27,13 @@ export async function createCourseAction(
     const title = String(formData.get("title") || "").trim();
     const description = String(formData.get("description") || "").trim();
     const passPercent = Number(formData.get("passPercent") || 80);
+    const maxAttempts = Number(formData.get("maxAttempts") || 0);
     const durationSec = Number(formData.get("durationSec") || 0);
+    const questionPoolId = String(formData.get("questionPoolId") || "").trim();
+    const questionCount = Number(formData.get("questionCount") || 0);
+    const categoryId = String(formData.get("categoryId") || "").trim();
+    const durationMinutes = Number(formData.get("durationMinutes") || 0);
+    const retakePolicy = parseRetakePolicy(formData.get("retakePolicy"));
     const file = formData.get("video");
 
     if (!title || !description || !(file instanceof Blob) || file.size < 1) {
@@ -28,8 +42,9 @@ export async function createCourseAction(
     if (!durationSec || durationSec < 1) {
       return { ok: false, error: "Video süresi gerekli" };
     }
-
-    // ~450MB soft guard for PoC local uploads
+    if (!Number.isFinite(passPercent) || passPercent < 0 || passPercent > 100) {
+      return { ok: false, error: "Geçme barajı 0-100 arasında olmalı" };
+    }
     if (file.size > 450 * 1024 * 1024) {
       return {
         ok: false,
@@ -45,11 +60,20 @@ export async function createCourseAction(
 
     await uploadFileObject(storageKey, file, contentType);
 
+    const safeMaxAttempts = Number.isFinite(maxAttempts) ? maxAttempts : 0;
+    const safeQuestionCount = Number.isFinite(questionCount) ? questionCount : 0;
+
     const course = await prisma.course.create({
       data: {
         title,
         description,
+        categoryId: categoryId || null,
+        // Sınav ayarlarının kaynağı Exam'dir; Course üzerindeki eski alanlar
+        // geriye dönük uyumluluk için aynı değerlerle yazılır.
         passPercent,
+        maxAttempts: safeMaxAttempts,
+        questionPoolId: questionPoolId || null,
+        questionCount: safeQuestionCount,
         video: {
           create: {
             storageKey,
@@ -59,9 +83,28 @@ export async function createCourseAction(
             sizeBytes: file.size,
           },
         },
+        exam: {
+          create: {
+            passPercent,
+            maxAttempts: safeMaxAttempts,
+            questionPoolId: questionPoolId || null,
+            questionCount: safeQuestionCount,
+            durationMinutes: durationMinutes > 0 ? durationMinutes : null,
+            retakePolicy,
+          },
+        },
       },
     });
 
+    await recordAudit({
+      action: AuditAction.ADMIN_CREATED_COURSE,
+      actor: session,
+      entityType: "Course",
+      entityId: course.id,
+      metadata: { title, storageKey, passPercent, retakePolicy },
+    });
+
+    revalidatePath("/admin/courses");
     return { ok: true, id: course.id };
   } catch (err) {
     console.error("createCourseAction failed:", err);
@@ -72,15 +115,50 @@ export async function createCourseAction(
   }
 }
 
-export type AddQuestionResult =
-  | { ok: true }
-  | { ok: false; error: string };
+export type SimpleResult = { ok: true } | { ok: false; error: string };
+
+export async function createPoolAction(input: {
+  name: string;
+  description: string;
+}): Promise<SimpleResult> {
+  try {
+    const session = await requireSession([Role.ADMIN]);
+    if (!session) return { ok: false, error: "Oturum gerekli" };
+
+    const name = input.name.trim();
+    if (name.length < 2) return { ok: false, error: "Havuz adı çok kısa" };
+
+    const exists = await prisma.questionPool.findUnique({ where: { name } });
+    if (exists) return { ok: false, error: "Bu isimde bir havuz zaten var" };
+
+    const pool = await prisma.questionPool.create({
+      data: { name, description: input.description.trim() },
+    });
+
+    await recordAudit({
+      action: AuditAction.ADMIN_CREATED_QUESTION_POOL,
+      actor: session,
+      entityType: "QuestionPool",
+      entityId: pool.id,
+      metadata: { name },
+    });
+
+    revalidatePath("/admin/courses");
+    return { ok: true };
+  } catch (err) {
+    console.error("createPoolAction failed:", err);
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Havuz oluşturulamadı",
+    };
+  }
+}
 
 export async function addQuestionAction(input: {
-  courseId: string;
+  poolId: string;
   prompt: string;
   choices: { text: string; isCorrect: boolean }[];
-}): Promise<AddQuestionResult> {
+}): Promise<SimpleResult> {
   try {
     const session = await requireSession([Role.ADMIN]);
     if (!session) return { ok: false, error: "Oturum gerekli" };
@@ -88,29 +166,27 @@ export async function addQuestionAction(input: {
     const prompt = input.prompt.trim();
     const choices = input.choices.filter((c) => c.text.trim().length > 0);
 
-    if (!input.courseId) return { ok: false, error: "Eğitim seçin" };
+    if (!input.poolId) return { ok: false, error: "Soru havuzu seçin" };
     if (prompt.length < 3) return { ok: false, error: "Soru metni çok kısa" };
-    if (choices.length < 2) {
-      return { ok: false, error: "En az 2 şık gerekli" };
-    }
-    if (!choices.some((c) => c.isCorrect)) {
-      return { ok: false, error: "En az 1 doğru cevap işaretleyin (şık|1)" };
+    if (choices.length < 2) return { ok: false, error: "En az 2 şık gerekli" };
+    if (choices.filter((c) => c.isCorrect).length !== 1) {
+      return { ok: false, error: "Tam olarak 1 doğru cevap işaretleyin" };
     }
 
-    const course = await prisma.course.findUnique({
-      where: { id: input.courseId },
+    const pool = await prisma.questionPool.findUnique({
+      where: { id: input.poolId },
     });
-    if (!course) return { ok: false, error: "Eğitim bulunamadı" };
+    if (!pool) return { ok: false, error: "Soru havuzu bulunamadı" };
 
-    const count = await prisma.question.count({
-      where: { courseId: input.courseId },
+    const sortOrder = await prisma.question.count({
+      where: { poolId: input.poolId },
     });
 
     await prisma.question.create({
       data: {
-        courseId: input.courseId,
+        poolId: input.poolId,
         prompt,
-        sortOrder: count,
+        sortOrder,
         choices: {
           create: choices.map((c) => ({
             text: c.text.trim(),
@@ -120,6 +196,7 @@ export async function addQuestionAction(input: {
       },
     });
 
+    revalidatePath("/admin/courses");
     return { ok: true };
   } catch (err) {
     console.error("addQuestionAction failed:", err);

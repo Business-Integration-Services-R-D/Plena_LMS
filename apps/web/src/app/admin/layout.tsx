@@ -16,8 +16,10 @@ export default async function AdminLayout({
       nav={[
         { href: "/admin", label: "Özet" },
         { href: "/admin/users", label: "Kullanıcılar" },
+        { href: "/admin/groups", label: "Ekipler" },
         { href: "/admin/courses", label: "Eğitimler" },
         { href: "/admin/assignments", label: "Atamalar" },
+        { href: "/admin/reports", label: "Raporlar" },
         { href: "/admin/audit", label: "Denetim" },
       ]}
     >

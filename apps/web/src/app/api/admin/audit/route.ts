@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Role } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const session = await requireSession([Role.ADMIN]);
@@ -13,7 +15,7 @@ export async function GET(req: NextRequest) {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
 
-  const createdAt =
+  const createdAt: Prisma.DateTimeFilter | undefined =
     from || to
       ? {
           gte: from ? new Date(from) : undefined,
@@ -21,16 +23,12 @@ export async function GET(req: NextRequest) {
         }
       : undefined;
 
-  const [watchEvents, quizAttempts, progress] = await Promise.all([
+  const [watchEvents, quizAttempts, systemLogs] = await Promise.all([
     prisma.watchEvent.findMany({
-      where: {
-        userId,
-        createdAt,
-        video: courseId ? { courseId } : undefined,
-      },
+      where: { userId, courseId, createdAt },
       include: {
         user: { select: { id: true, name: true, email: true } },
-        video: { include: { course: { select: { id: true, title: true } } } },
+        course: { select: { id: true, title: true } },
       },
       orderBy: { createdAt: "desc" },
       take: 500,
@@ -44,15 +42,15 @@ export async function GET(req: NextRequest) {
       orderBy: { completedAt: "desc" },
       take: 500,
     }),
-    prisma.watchProgress.findMany({
-      where: { userId, courseId },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
-        course: { select: { id: true, title: true } },
-      },
-      orderBy: { updatedAt: "desc" },
+    // Video dışı sistem eylemleri. Eğitim filtresi burada geçerli değil,
+    // çünkü denetim kaydı eğitime bağlı olmak zorunda değil.
+    prisma.auditLog.findMany({
+      where: { actorId: userId, createdAt },
+      include: { actor: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 500,
     }),
   ]);
 
-  return NextResponse.json({ watchEvents, quizAttempts, progress });
+  return NextResponse.json({ watchEvents, quizAttempts, systemLogs });
 }

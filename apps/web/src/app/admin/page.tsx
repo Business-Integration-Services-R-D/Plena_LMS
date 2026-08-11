@@ -1,21 +1,31 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { refreshOverdue } from "@/lib/enrollment";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminHomePage() {
-  const [users, courses, events, attempts] = await Promise.all([
-    prisma.user.count({ where: { role: "CAPTAIN" } }),
-    prisma.course.count(),
-    prisma.watchEvent.count(),
-    prisma.quizAttempt.count(),
-  ]);
+  await refreshOverdue();
+
+  const [users, groups, courses, questions, enrollments, overdue, completed] =
+    await Promise.all([
+      prisma.user.count({ where: { role: "USER", active: true } }),
+      prisma.group.count(),
+      prisma.course.count(),
+      prisma.question.count({ where: { active: true } }),
+      prisma.enrollment.count(),
+      prisma.enrollment.count({ where: { status: "OVERDUE" } }),
+      prisma.enrollment.count({ where: { status: "COMPLETED" } }),
+    ]);
 
   const cards = [
-    { label: "Kaptan", value: users, href: "/admin/users" },
+    { label: "Aktif kullanıcı", value: users, href: "/admin/users" },
+    { label: "Ekip", value: groups, href: "/admin/groups" },
     { label: "Eğitim", value: courses, href: "/admin/courses" },
-    { label: "İzleme olayı", value: events, href: "/admin/audit" },
-    { label: "Sınav denemesi", value: attempts, href: "/admin/audit" },
+    { label: "Havuzdaki soru", value: questions, href: "/admin/courses" },
+    { label: "Atanmış kayıt", value: enrollments, href: "/admin/reports" },
+    { label: "Tamamlanan", value: completed, href: "/admin/reports" },
+    { label: "Süresi geçen", value: overdue, href: "/admin/reports" },
   ];
 
   return (
@@ -23,8 +33,9 @@ export default async function AdminHomePage() {
       <section className="rounded-3xl border border-sea-200 bg-white/90 p-6">
         <h2 className="text-xl font-semibold text-sea-950">Yönetici paneli</h2>
         <p className="mt-2 max-w-2xl text-sm text-sea-600">
-          PoC kapsamında kullanıcı, eğitim, atama ve denetim raporlarını yönetin. Kaptan tarafında
-          ileri sarma engelli oynatıcıyı doğrulayabilirsiniz.
+          Kullanıcı, ekip, soru havuzu, eğitim ve tarih pencereli atamaları buradan
+          yönetin. Raporlar sekmesinde izleme süresi, doğru/yanlış sayısı ve
+          tamamlama durumlarını görebilirsiniz.
         </p>
       </section>
       <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

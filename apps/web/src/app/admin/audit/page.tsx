@@ -9,7 +9,7 @@ type AuditPayload = {
     positionSec: number;
     createdAt: string;
     user: { name: string; email: string };
-    video: { course: { title: string } };
+    course: { title: string };
   }>;
   quizAttempts: Array<{
     id: string;
@@ -20,14 +20,31 @@ type AuditPayload = {
     user: { name: string; email: string };
     course: { title: string };
   }>;
-  progress: Array<{
+  systemLogs: Array<{
     id: string;
-    watchedPercent: number;
-    status: string;
-    maxReachedSec: number;
-    user: { name: string };
-    course: { title: string };
+    action: string;
+    actorEmail: string | null;
+    entityType: string | null;
+    entityId: string | null;
+    createdAt: string;
+    actor: { name: string; email: string } | null;
   }>;
+};
+
+/** Denetim eylemlerinin okunabilir Türkçe karşılıkları. */
+const ACTION_TR: Record<string, string> = {
+  ADMIN_CREATED_USER: "Kullanıcı oluşturuldu",
+  ADMIN_UPDATED_USER: "Kullanıcı güncellendi",
+  ADMIN_CHANGED_USER_STATUS: "Kullanıcı durumu değişti",
+  ADMIN_CREATED_COURSE: "Eğitim oluşturuldu",
+  ADMIN_CREATED_GROUP: "Ekip oluşturuldu",
+  ADMIN_ADDED_GROUP_MEMBER: "Ekibe üye eklendi",
+  ADMIN_REMOVED_GROUP_MEMBER: "Ekipten üye çıkarıldı",
+  ADMIN_ASSIGNED_COURSE: "Eğitim atandı",
+  ADMIN_CREATED_QUESTION_POOL: "Soru havuzu oluşturuldu",
+  ADMIN_EXPORTED_REPORT: "Rapor dışa aktarıldı",
+  USER_LOGGED_IN: "Giriş yapıldı",
+  USER_LOGGED_OUT: "Çıkış yapıldı",
 };
 
 export default function AdminAuditPage() {
@@ -66,34 +83,6 @@ export default function AdminAuditPage() {
         </div>
       </section>
 
-      <section className="rounded-3xl border border-sea-200 bg-white p-5">
-        <h3 className="font-semibold">İlerleme özeti</h3>
-        <div className="mt-3 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="text-sea-500">
-              <tr>
-                <th className="py-2">Kaptan</th>
-                <th>Eğitim</th>
-                <th>İzleme %</th>
-                <th>Max sn</th>
-                <th>Durum</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.progress.map((p) => (
-                <tr key={p.id} className="border-t border-sea-100">
-                  <td className="py-2">{p.user.name}</td>
-                  <td>{p.course.title}</td>
-                  <td>{p.watchedPercent.toFixed(0)}%</td>
-                  <td>{p.maxReachedSec.toFixed(1)}</td>
-                  <td>{p.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-3xl border border-sea-200 bg-white p-5">
           <h3 className="font-semibold">İzleme olayları</h3>
@@ -104,7 +93,7 @@ export default function AdminAuditPage() {
                   {e.user.name} · {e.eventType} · {e.positionSec.toFixed(1)}s
                 </div>
                 <div className="text-xs text-sea-500">
-                  {e.video.course.title} · {new Date(e.createdAt).toLocaleString("tr-TR")}
+                  {e.course.title} · {new Date(e.createdAt).toLocaleString("tr-TR")}
                 </div>
               </li>
             ))}
@@ -129,6 +118,30 @@ export default function AdminAuditPage() {
           </ul>
         </section>
       </div>
+
+      <section className="rounded-3xl border border-sea-200 bg-white p-5">
+        <h3 className="font-semibold">Sistem denetim kayıtları</h3>
+        <p className="text-xs text-sea-500">
+          Kullanıcı, ekip, eğitim ve atama yönetimi gibi video dışı işlemler
+        </p>
+        <ul className="mt-3 max-h-96 space-y-2 overflow-auto text-sm">
+          {(data.systemLogs ?? []).map((log) => (
+            <li key={log.id} className="rounded-xl border border-sea-100 px-3 py-2">
+              <div className="font-medium">
+                {ACTION_TR[log.action] ?? log.action}
+              </div>
+              <div className="text-xs text-sea-500">
+                {log.actor?.name ?? log.actorEmail ?? "Sistem"}
+                {log.entityType ? ` · ${log.entityType}` : ""} ·{" "}
+                {new Date(log.createdAt).toLocaleString("tr-TR")}
+              </div>
+            </li>
+          ))}
+          {(data.systemLogs ?? []).length === 0 && (
+            <li className="text-sm text-sea-500">Henüz denetim kaydı yok.</li>
+          )}
+        </ul>
+      </section>
     </div>
   );
 }

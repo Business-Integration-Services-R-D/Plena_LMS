@@ -1,85 +1,59 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { sanitizeStorageKeyPart, uploadFileObject } from "@/lib/storage";
+import { resolveExamSettings } from "@/lib/exam";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Eğitim oluşturma createCourseAction (server action) üzerinden yapılır;
+// büyük video yüklemeleri route handler gövde limitine takılıyordu.
 export async function GET() {
   const session = await requireSession([Role.ADMIN]);
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const poolSelect = {
+    id: true,
+    name: true,
+    _count: { select: { questions: true } },
+  } as const;
+
   const courses = await prisma.course.findMany({
     include: {
       video: true,
-      questions: { include: { choices: true }, orderBy: { sortOrder: "asc" } },
-      _count: { select: { assignments: true } },
+      category: { select: { id: true, name: true } },
+      questionPool: { select: poolSelect },
+      exam: { include: { questionPool: { select: poolSelect } } },
+      _count: { select: { assignments: true, enrollments: true } },
     },
     orderBy: { createdAt: "desc" },
   });
-  return NextResponse.json(courses);
-}
 
-export async function POST(req: NextRequest) {
-  try {
-    const session = await requireSession([Role.ADMIN]);
-    if (!session) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+  return NextResponse.json(
+    courses.map((c) => {
+      const settings = resolveExamSettings(c, c.exam);
+      const pool = c.exam?.questionPool ?? c.questionPool;
 
-    const form = await req.formData();
-    const title = String(form.get("title") || "").trim();
-    const description = String(form.get("description") || "").trim();
-    const passPercent = Number(form.get("passPercent") || 80);
-    const durationSec = Number(form.get("durationSec") || 0);
-    const file = form.get("video");
-
-    if (!title || !description || !(file instanceof Blob)) {
-      return NextResponse.json(
-        { error: "Başlık, açıklama ve video zorunlu" },
-        { status: 400 },
-      );
-    }
-    if (!durationSec || durationSec < 1) {
-      return NextResponse.json(
-        { error: "Video süresi (saniye) gerekli" },
-        { status: 400 },
-      );
-    }
-
-    const originalName =
-      file instanceof File && file.name ? file.name : "video.mp4";
-    const safeName = sanitizeStorageKeyPart(originalName);
-    const storageKey = `courses/${Date.now()}-${safeName}`;
-    const contentType = file.type || "video/mp4";
-
-    await uploadFileObject(storageKey, file, contentType);
-
-    const course = await prisma.course.create({
-      data: {
-        title,
-        description,
-        passPercent,
-        video: {
-          create: {
-            storageKey,
-            fileName: originalName,
-            contentType,
-            durationSec,
-            sizeBytes: file.size,
-          },
-        },
-      },
-      include: { video: true },
-    });
-
-    return NextResponse.json(course, { status: 201 });
-  } catch (err) {
-    console.error("POST /api/admin/courses failed:", err);
-    const message =
-      err instanceof Error ? err.message : "Eğitim oluşturulamadı";
-    return NextResponse.json({ error: message }, { status: 500 });
-  }
+      return {
+        id: c.id,
+        title: c.title,
+        description: c.description,
+        active: c.active,
+        category: c.category,
+        passPercent: settings.passPercent,
+        maxAttempts: settings.maxAttempts,
+        questionCount: settings.questionCount,
+        durationMinutes: settings.durationMinutes,
+        retakePolicy: settings.retakePolicy,
+        pool: pool
+          ? { id: pool.id, name: pool.name, total: pool._count.questions }
+          : null,
+        video: c.video,
+        assignmentCount: c._count.assignments,
+        enrollmentCount: c._count.enrollments,
+        createdAt: c.createdAt,
+      };
+    }),
+  );
 }
