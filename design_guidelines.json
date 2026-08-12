@@ -1,0 +1,145 @@
+{
+  "theme": "Apple-inspired Minimalist Light Theme (Turkish LMS Platform)",
+  "typography": {
+    "fonts": {
+      "headings": "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif",
+      "body": "-apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif",
+      "mono": "SF Mono, ui-monospace, Menlo, Monaco, monospace"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl tracking-tight font-semibold text-gray-900",
+      "h2": "text-2xl sm:text-3xl tracking-tight font-medium text-gray-900",
+      "h3": "text-xl sm:text-2xl tracking-tight font-medium text-gray-800",
+      "body": "text-base leading-relaxed text-gray-600",
+      "small": "text-sm text-gray-500"
+    },
+    "rules": [
+      "No generic sans (like Inter or Open Sans) for headings. Emulate SF Pro with tight tracking.",
+      "Use tracking-tight or tracking-tighter for all headings above 24px.",
+      "Overlines/Sublabels must be uppercase, text-xs, tracking-[0.2em] font-medium.",
+      "Never center align paragraphs or dense text; strictly left-aligned for readability."
+    ]
+  },
+  "colors": {
+    "background": "#F5F5F7",
+    "surface": "#FFFFFF",
+    "primary": "#000000",
+    "primary_foreground": "#FFFFFF",
+    "secondary": "#E5E5EA",
+    "secondary_foreground": "#1D1D1F",
+    "accent": "#007AFF",
+    "text_main": "#1D1D1F",
+    "text_muted": "#86868B",
+    "border": "rgba(0, 0, 0, 0.06)",
+    "success": "#34C759",
+    "warning": "#FF9500",
+    "error": "#FF3B30",
+    "rules": [
+      "No completely transparent backgrounds on headers or overlays; always use blur (glassmorphism) or solid colors.",
+      "Limit the use of primary colors to CTAs (Buttons, Form Submits).",
+      "Ensure minimum 4.5:1 contrast ratio (WCAG AA) for all normal text.",
+      "Never use pure black or grey as gradients."
+    ]
+  },
+  "visual enhancers": {
+    "shadows": "Use extremely soft, ambient shadows. Default card shadow: shadow-sm. Elevated elements: shadow-[0_8px_30px_rgb(0,0,0,0.04)]",
+    "borders": "1px solid rgba(0,0,0,0.06) on cards and inputs to define boundaries without heaviness.",
+    "glassmorphism": "backdrop-blur-2xl bg-white/70 with a delicate 1px border-white/20 for sticky headers, modal overlays, and floating video controls.",
+    "corners": "Rounded radii resembling Apple's squircle: rounded-xl (12px) or rounded-2xl (16px) for cards, rounded-full for pills."
+  },
+  "component name": "Shadcn UI Customization",
+  "component_path": "/app/frontend/src/components/ui",
+  "grids": {
+    "bento_mode": "High Density Grid for Admin Dashboard (grid-cols-1 md:grid-cols-3 lg:grid-cols-4)",
+    "gap": "gap-6 for dashboard to maintain breathing room",
+    "rules": [
+      "Every pixel utilized, ensure h-full on children for uniform card heights.",
+      "Grid items MUST be direct children of the grid container.",
+      "For forms and settings, use narrow column layouts (max-w-2xl)."
+    ]
+  },
+  "layouts": {
+    "container": "Generous Spacing: Use p-8 or p-12 for page wrappers to give a premium WeTransfer/Notion feel.",
+    "navigation": "Always visible side navigation or sleek top glassmorphic nav bar with clear routing.",
+    "video_player": "Edge-to-edge or rounded-2xl cinematic container with inline floating checkpoint overlays.",
+    "anti_skip_timeline": "Segments explicitly colored (gray for un-watched, blue for watched, dots for checkpoints)."
+  },
+  "motion": {
+    "interactions": "Hover states with slight translate (-translate-y-0.5) and slight shadow increase. Active state: scale down (scale-95).",
+    "transitions": "transition: transform 0.2s ease, opacity 0.2s ease (Never use 'transition: all').",
+    "rules": [
+      "Must respect prefers-reduced-motion.",
+      "Staggered entrance animations for training lists using Framer Motion or simple CSS delays."
+    ]
+  },
+  "accessibility": {
+    "testing": "CRITICAL: All interactive elements MUST have a 'data-testid' attribute in kebab-case (e.g., data-testid='video-play-btn').",
+    "focus": "Clear focus rings around inputs and buttons: focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+    "contrast": "APCA contrast calculator preferred, text colors must remain visible in all states (especially hover)."
+  },
+  "media": {
+    "strategy": "Professional, minimalist corporate aesthetic with abundant whitespace.",
+    "rules": [
+      "Mobile height limit: Images MUST NOT exceed 80vh.",
+      "NEVER use placeholder text or dummy services for images."
+    ]
+  },
+  "3d libraries": {
+    "strategy": "Not recommended for this minimal, data-heavy LMS structure. Prioritize blazing-fast 2D interactions and smooth page routing."
+  },
+  "image_urls": [
+    {
+      "url": "https://images.unsplash.com/photo-1558478551-1a378f63328e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwyfHxtaW5pbWFsJTIwZGVzayUyMHdvcmtzcGFjZSUyMHdoaXRlfGVufDB8fHx8MTc4NjQ0NjE2M3ww&ixlib=rb-4.1.0&q=85",
+      "category": "Dashboard Empty State / Auth Background",
+      "description": "Minimal white desk workspace, very Apple-like."
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1587522384446-64daf3e2689a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjh8MHwxfHNlYXJjaHwxfHxtaW5pbWFsJTIwZGVzayUyMHdvcmtzcGFjZSUyMHdoaXRlfGVufDB8fHx8MTc4NjQ0NjE2M3ww&ixlib=rb-4.1.0&q=85",
+      "category": "Login Hero Image",
+      "description": "Black flat screen on white desk."
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1659353216202-47e96c4374d4?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHw0fHxwcm9mZXNzaW9uYWwlMjBjb3Jwb3JhdGUlMjB3b3JrZXIlMjBtaW5pbWFsfGVufDB8fHx8MTc4NjQ0NjE2M3ww&ixlib=rb-4.1.0&q=85",
+      "category": "User Profile / Employee Avatar",
+      "description": "Professional worker on clean grey background."
+    },
+    {
+      "url": "https://images.unsplash.com/photo-1659353215553-044993dcdd39?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwyfHxwcm9mZXNzaW9uYWwlMjBjb3Jwb3JhdGUlMjB3b3JrZXIlMjBtaW5pbWFsfGVufDB8fHx8MTc4NjQ0NjE2M3ww&ixlib=rb-4.1.0&q=85",
+      "category": "Instructor / Admin Avatar",
+      "description": "Professional worker in white shirt."
+    }
+  ],
+  "GENERAL UI UX DESIGN GUIDELINES": [
+    "Design with an Apple-level meticulousness. Interfaces must look extremely clean, with whitespace acting as a structural element.",
+    "Use subtle grays for section backgrounds (#F5F5F7) and crisp white (#FFFFFF) for content cards.",
+    "Never overcrowd a screen; if the Admin dashboard has many stats, use a tight grid but generous padding within each cell.",
+    "Build the video player with high-end tech aesthetics: transparent dark overlay controls (not fully transparent, use blur), clear checkpoint markers on the scrub bar.",
+    "When a video reaches a checkpoint, dim the video background and present a centered, pristine white modal card for the quiz question.",
+    "All interactive elements MUST include a data-testid attribute to facilitate robust automated testing.",
+    "Avoid unnecessary borders. Use spacing and subtle background color changes to denote hierarchy."
+  ],
+  "instructions_to_main_agent": [
+    "Read this entire JSON configuration and strictly adhere to the color and typography variables.",
+    "Set the Tailwind config to use #F5F5F7 for background and #FFFFFF for cards. Primary color should be deep black (#000000) or Apple Blue (#007AFF) for links/buttons.",
+    "Build the UI entirely in Turkish ('Google ile Giriş Yap', 'Eğitimlerim', 'Kullanıcı Yönetimi' vb.).",
+    "File extensions MUST be .js (and .jsx semantics), do not create .tsx or .ts files.",
+    "Implement the 'Video Player' logic completely: lock seeking forward, render checkpoint markers, pause and show question modal, rewind on fail.",
+    "Implement the Admin Dashboard: Use Shadcn tables for User/Group management and Recharts for Reports & Audit (izleme süreleri, sınav sonuçları).",
+    "Ensure 'sonner' is used for all toast notifications (success/error messages).",
+    "Add 'data-testid' to absolutely every form input, button, and navigation item."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "You tend to converge toward generic outputs. Avoid 'AI slop' by injecting generous padding, removing heavy drop shadows in favor of thin 1px borders or very ambient blurs, and avoiding over-decorated gradients.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) for sticky navs and popups.",
+    "You MUST NOT apply universal transition (e.g., transition: all). Add specific transitions for interactive elements.",
+    "You MUST NOT center align the app container (.App { text-align: center; } is banned). Ensure standard left-aligned top-down document flow.",
+    "Always use modern button styles (pill-shaped or nicely rounded).",
+    "NEVER use AI assistant Emoji characters (like 🤖🧠) for icons. Use real SVG icons (lucide-react).",
+    "Every interaction needs micro-animations (hover states, simple scale/translate).",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Prioritize using pre-existing components from src/components/ui. Create new components that match the style.",
+    "Missing images must not be replaced with dummy text; strictly use the URLs provided."
+  ]
+}
