@@ -160,6 +160,48 @@ export async function statObject(key: string): Promise<{ size: number }> {
 }
 
 /**
+ * Node akışını web akışına çevirir.
+ *
+ * `Readable.toWeb` yerine elle sarmalanır: oynatıcı isteği yarıda kestiğinde
+ * (sarma, sekme kapatma) controller kapanır ve `toWeb` kapalı controller'a
+ * yazmayı deneyip route'un try/catch'ine düşmeyen ERR_INVALID_STATE atar.
+ * Burada controller durumu takip edilir, iptalde dosya tanıtıcısı kapatılır.
+ */
+function nodeStreamToWeb(nodeStream: Readable): ReadableStream<Uint8Array> {
+  let settled = false;
+
+  const settle = (
+    controller: ReadableStreamDefaultController<Uint8Array>,
+    err?: unknown,
+  ) => {
+    if (settled) return;
+    settled = true;
+    if (err) controller.error(err);
+    else controller.close();
+  };
+
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      nodeStream.on("data", (chunk: Buffer) => {
+        if (settled) return;
+        controller.enqueue(new Uint8Array(chunk));
+        // Tüketici yetişemiyorsa dosyadan okumayı beklet (backpressure).
+        if ((controller.desiredSize ?? 1) <= 0) nodeStream.pause();
+      });
+      nodeStream.on("end", () => settle(controller));
+      nodeStream.on("error", (err) => settle(controller, err));
+    },
+    pull() {
+      nodeStream.resume();
+    },
+    cancel() {
+      settled = true;
+      nodeStream.destroy();
+    },
+  });
+}
+
+/**
  * Dosyayı (veya verilen byte aralığını) akış olarak okur.
  * Tüm videoyu belleğe almadan servis edebilmek için kullanılır.
  */
@@ -168,8 +210,7 @@ export async function readObjectStream(
   range?: ByteRange,
 ): Promise<ReadableStream<Uint8Array>> {
   if (storageDriver() === "local") {
-    const nodeStream = createReadStream(localPath(key), range);
-    return Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+    return nodeStreamToWeb(createReadStream(localPath(key), range));
   }
 
   const obj = await getS3Client().send(
