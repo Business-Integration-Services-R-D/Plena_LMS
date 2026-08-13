@@ -1,27 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-export PATH="$ROOT/.tools/node/bin:$ROOT/.tools/mongodb/bin:$PATH"
+export PATH="$ROOT/.tools/node/bin:$PATH"
 
-mkdir -p "$ROOT/.tools/mongo-data" "$ROOT/.tools/mongo-logs"
+PGBIN="$ROOT/edu_module/.tools/pg/node_modules/@embedded-postgres/darwin-arm64/native/bin"
+PGDATA="$ROOT/edu_module/.tools/pg/data"
 
-if ! pgrep -x mongod >/dev/null; then
-  mongod --dbpath "$ROOT/.tools/mongo-data" --port 27017 --bind_ip 127.0.0.1 \
-    --logpath "$ROOT/.tools/mongo-logs/mongod.log" --fork
-  echo "MongoDB started on :27017"
+if "$PGBIN/pg_ctl" -D "$PGDATA" status >/dev/null 2>&1; then
+  echo "PostgreSQL zaten calisiyor (:5432)"
 else
-  echo "MongoDB already running"
+  "$PGBIN/pg_ctl" -D "$PGDATA" -l "$ROOT/edu_module/.tools/pg/pg.log" start
+  echo "PostgreSQL basladi (:5432)"
 fi
 
-echo "Starting backend on :8000 ..."
+echo "API basliyor (:3001) ..."
 (
-  cd "$ROOT/backend"
-  # shellcheck disable=SC1091
-  source .venv/bin/activate
-  uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+  cd "$ROOT/edu_module/apps/web"
+  npm run dev -- -p 3001
 ) &
 
-echo "Starting frontend on :3000 ..."
+echo "Arayuz basliyor (:3000) ..."
 (
   cd "$ROOT/frontend"
   BROWSER=none yarn start
