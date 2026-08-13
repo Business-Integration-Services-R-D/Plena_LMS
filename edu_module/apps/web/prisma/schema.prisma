@@ -1,0 +1,488 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+/// Kullanıcının bir eğitimdeki durumu.
+enum EnrollmentStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  OVERDUE
+}
+
+/// Atamanın kişiye mi ekibe mi yapıldığı.
+enum AssignmentTarget {
+  USER
+  GROUP
+}
+
+/// Video oynatıcıdan gelen denetim olayları.
+enum WatchEventType {
+  START
+  RESUME
+  HEARTBEAT
+  PAUSE
+  SEEK_BLOCKED
+  EXIT
+  COMPLETE
+  CHECKPOINT_PASSED
+  CHECKPOINT_FAILED
+}
+
+/// Soru tipi. Şimdilik tek tip var; model ileride genişlemeye açık.
+enum QuestionType {
+  MULTIPLE_CHOICE
+  /// Doğru/yanlış cevabı olmayan açık uçlu soru; puanlamaya dahil edilmez.
+  FREE_TEXT
+}
+
+/// Kontrol noktasında başarısız olunca uygulanacak politika.
+/// RETRY: video sarılmaz, soru tekrar sorulur (maxAttempts null ise sınırsız).
+enum CheckpointOnFail {
+  START
+  PREVIOUS
+  RETRY
+}
+
+/// Testi geçemeyen kullanıcının tekrar denerken ne yapması gerektiği.
+enum RetakePolicy {
+  /// Sadece testi tekrar çözer.
+  TEST_ONLY
+  /// Videoyu baştan izleyip sonra teste girer.
+  VIDEO_AND_TEST
+}
+
+/// Video dışındaki genel sistem/denetim eylemleri.
+/// Video oynatıcı aktiviteleri için WatchEvent kullanılır.
+enum AuditAction {
+  ADMIN_CREATED_USER
+  ADMIN_UPDATED_USER
+  ADMIN_CHANGED_USER_STATUS
+  ADMIN_CREATED_COURSE
+  ADMIN_UPDATED_COURSE
+  ADMIN_CREATED_GROUP
+  ADMIN_UPDATED_GROUP
+  ADMIN_ADDED_GROUP_MEMBER
+  ADMIN_REMOVED_GROUP_MEMBER
+  ADMIN_ASSIGNED_COURSE
+  ADMIN_CREATED_QUESTION_POOL
+  ADMIN_EXPORTED_REPORT
+  USER_LOGGED_IN
+  USER_LOGGED_OUT
+}
+
+// ---------------------------------------------------------------------------
+// 1) Kullanıcılar
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(USER)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships    GroupMember[]
+  assignments    Assignment[]  @relation("AssignmentTargetUser")
+  createdAssigns Assignment[]  @relation("AssignmentCreatedBy")
+  enrollments    Enrollment[]
+  watchEvents    WatchEvent[]
+  quizAttempts   QuizAttempt[]
+  auditLogs      AuditLog[]
+
+  @@index([active])
+}
+
+// ---------------------------------------------------------------------------
+// 4) Ekipler (gruplar) ve üyelikleri
+// ---------------------------------------------------------------------------
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String   @default("")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     GroupMember[]
+  assignments Assignment[]  @relation("AssignmentTargetGroup")
+}
+
+model GroupMember {
+  id       String   @id @default(cuid())
+  groupId  String
+  userId   String
+  joinedAt DateTime @default(now())
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// 2) Soru havuzu
+// ---------------------------------------------------------------------------
+
+model QuestionPool {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  questions Question[]
+  courses   Course[]
+  exams     Exam[]
+}
+
+model Question {
+  id        String       @id @default(cuid())
+  poolId    String
+  prompt    String
+  type      QuestionType @default(MULTIPLE_CHOICE)
+  sortOrder Int          @default(0)
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now())
+
+  pool        QuestionPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  choices     Choice[]
+  answers     QuizAnswer[]
+  checkpoints Checkpoint[]
+
+  @@index([poolId, sortOrder])
+}
+
+model Choice {
+  id         String  @id @default(cuid())
+  questionId String
+  text       String
+  isCorrect  Boolean @default(false)
+
+  question Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers  QuizAnswer[]
+
+  @@index([questionId])
+}
+
+// ---------------------------------------------------------------------------
+// 3) Eğitimler
+// ---------------------------------------------------------------------------
+
+/// Eğitimleri gruplamak için kullanılan konu başlığı.
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  courses Course[]
+}
+
+model Course {
+  id          String  @id @default(cuid())
+  title       String
+  description String  @default("")
+  active      Boolean @default(true)
+
+  /// Kategorisi olmayan eski eğitimler için nullable.
+  categoryId String?
+
+  /// Sınav ayarlarının yeni adresi Exam modelidir. Aşağıdaki üç alan geriye
+  /// dönük uyumluluk için duruyor; okuma yolları Exam üzerinden gider.
+  /// @deprecated Exam.passPercent kullanın.
+  passPercent    Int     @default(80)
+  /// @deprecated Exam.maxAttempts kullanın. 0 = sınırsız deneme.
+  maxAttempts    Int     @default(0)
+  /// @deprecated Exam.questionPoolId kullanın.
+  questionPoolId String?
+  /// @deprecated Exam.questionCount kullanın. 0 = havuzdaki tüm sorular.
+  questionCount  Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  questionPool QuestionPool? @relation(fields: [questionPoolId], references: [id], onDelete: SetNull)
+  exam         Exam?
+  video        Video?
+  checkpoints  Checkpoint[]
+  assignments  Assignment[]
+  enrollments  Enrollment[]
+  quizAttempts QuizAttempt[]
+  watchEvents  WatchEvent[]
+
+  @@index([active])
+  @@index([categoryId])
+}
+
+/// Bir eğitimin sınav ayarları. Şu an eğitim başına tek sınav var.
+model Exam {
+  id       String @id @default(cuid())
+  courseId String @unique
+
+  /// Sorular bu havuzdan çekilir.
+  questionPoolId String?
+  /// Havuzdan kaç soru sorulacak. 0 = havuzdaki tüm sorular.
+  questionCount  Int     @default(0)
+
+  /// Geçmek için gereken yüzde.
+  passPercent     Int  @default(80)
+  /// 0 = sınırsız deneme.
+  maxAttempts     Int  @default(0)
+  /// null = süre sınırı yok.
+  durationMinutes Int?
+
+  retakePolicy RetakePolicy @default(TEST_ONLY)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course       Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questionPool QuestionPool? @relation(fields: [questionPoolId], references: [id], onDelete: SetNull)
+  attempts     QuizAttempt[]
+
+  @@index([questionPoolId])
+}
+
+/// Video içi kontrol noktası: video belirtilen saniyede durur ve soru sorar.
+/// Yanlış cevap/süre aşımı videoyu başa veya önceki noktaya sarar.
+model Checkpoint {
+  id             String           @id @default(cuid())
+  courseId       String
+  questionId     String
+  timeSec        Int
+  /// null = süre sınırı yok.
+  timeoutSeconds Int?
+  onFail         CheckpointOnFail @default(START)
+  /// Yalnızca RETRY için anlamlı: null = doğru yapana kadar sınırsız deneme.
+  /// Sayı verilirse hak bitince video başa sarılır.
+  maxAttempts    Int?
+  createdAt      DateTime         @default(now())
+
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, timeSec])
+}
+
+model Video {
+  id          String   @id @default(cuid())
+  courseId    String   @unique
+  storageKey  String
+  fileName    String
+  contentType String   @default("video/mp4")
+  durationSec Int
+  sizeBytes   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  watchEvents WatchEvent[]
+}
+
+// ---------------------------------------------------------------------------
+// 5) Atamalar — kullanıcıya veya ekibe, tarih penceresiyle
+// ---------------------------------------------------------------------------
+
+model Assignment {
+  id       String           @id @default(cuid())
+  courseId String
+  target   AssignmentTarget
+  /// target = USER ise dolu.
+  userId   String?
+  /// target = GROUP ise dolu.
+  groupId  String?
+
+  /// Eğitimin açılacağı tarih/saat. Bu andan önce kullanıcı eğitimi göremez.
+  startsAt     DateTime
+  /// Son tamamlama tarihi/saati. Geçilirse durum OVERDUE olur.
+  dueAt        DateTime?
+  assignedAt   DateTime  @default(now())
+  assignedById String?
+
+  course     Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user       User?  @relation("AssignmentTargetUser", fields: [userId], references: [id], onDelete: Cascade)
+  group      Group? @relation("AssignmentTargetGroup", fields: [groupId], references: [id], onDelete: Cascade)
+  assignedBy User?  @relation("AssignmentCreatedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  enrollments Enrollment[]
+
+  @@unique([courseId, userId])
+  @@unique([courseId, groupId])
+  @@index([startsAt])
+  @@index([dueAt])
+}
+
+// ---------------------------------------------------------------------------
+// 6 + 8) Kayıt: kullanıcı-eğitim durumu, ilerleme ve rapor özeti
+// ---------------------------------------------------------------------------
+
+model Enrollment {
+  id           String  @id @default(cuid())
+  userId       String
+  courseId     String
+  assignmentId String?
+
+  status EnrollmentStatus @default(NOT_STARTED)
+
+  /// Atamadan kopyalanan görünürlük penceresi.
+  startsAt   DateTime
+  dueAt      DateTime?
+  assignedAt DateTime  @default(now())
+
+  /// 8) Kaldığı yerden devam için oynatıcı durumu.
+  positionSec     Float   @default(0)
+  maxReachedSec   Float   @default(0)
+  watchedPercent  Float   @default(0)
+  /// 6) Toplam izleme süresi (saniye).
+  totalWatchedSec Int     @default(0)
+  videoCompleted  Boolean @default(false)
+
+  /// 6) Test özeti.
+  attemptCount     Int     @default(0)
+  bestScorePercent Float?
+  lastCorrectCount Int?
+  lastWrongCount   Int?
+  passed           Boolean @default(false)
+
+  firstStartedAt DateTime?
+  lastActivityAt DateTime?
+  completedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course       Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  assignment   Assignment?   @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  watchEvents  WatchEvent[]
+  quizAttempts QuizAttempt[]
+
+  @@unique([userId, courseId])
+  @@index([status])
+  @@index([userId, status])
+  @@index([dueAt])
+}
+
+// ---------------------------------------------------------------------------
+// 7) Video giriş/çıkış/duraklatma logları
+// ---------------------------------------------------------------------------
+
+model WatchEvent {
+  id           String         @id @default(cuid())
+  enrollmentId String
+  userId       String
+  courseId     String
+  videoId      String
+  eventType    WatchEventType
+  positionSec  Float
+  /// Olaya özel ek bilgi (ör. engellenen seek'in hedef saniyesi).
+  metadata     Json?
+  createdAt    DateTime       @default(now())
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  video      Video      @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([enrollmentId, createdAt])
+  @@index([userId, createdAt])
+  @@index([courseId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// 6) Sınav denemeleri ve cevap detayı
+// ---------------------------------------------------------------------------
+
+model QuizAttempt {
+  id           String  @id @default(cuid())
+  enrollmentId String
+  userId       String
+  courseId     String
+  /// Exam kaydı oluşmadan önceki eski denemelerde boş.
+  examId       String?
+
+  attemptNo    Int
+  scorePercent Float
+  correctCount Int
+  wrongCount   Int
+  passed       Boolean
+
+  startedAt   DateTime @default(now())
+  completedAt DateTime @default(now())
+
+  enrollment Enrollment   @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course     Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  exam       Exam?        @relation(fields: [examId], references: [id], onDelete: SetNull)
+  answers    QuizAnswer[]
+
+  @@unique([enrollmentId, attemptNo])
+  @@index([examId])
+  @@index([userId, courseId])
+  @@index([completedAt])
+}
+
+model QuizAnswer {
+  id         String  @id @default(cuid())
+  attemptId  String
+  questionId String
+  choiceId   String?
+  /// Serbest metin sorularının cevabı.
+  textAnswer String?
+  isCorrect  Boolean @default(false)
+
+  attempt  QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  choice   Choice?     @relation(fields: [choiceId], references: [id], onDelete: SetNull)
+
+  @@index([attemptId])
+  @@index([questionId])
+}
+
+// ---------------------------------------------------------------------------
+// 9) Genel denetim kaydı — video dışındaki sistem eylemleri
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id     String      @id @default(cuid())
+  action AuditAction
+
+  /// Eylemi yapan kullanıcı. Kullanıcı silinse de kayıt durur.
+  actorId    String?
+  /// Denetim izi kullanıcı silindikten sonra da okunabilsin diye kopyalanır.
+  actorEmail String?
+
+  /// Etkilenen kaydın türü ve kimliği (ör. "User", "Course").
+  entityType String?
+  entityId   String?
+
+  /// Eyleme özel serbest alan (ör. eski/yeni değer).
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([entityType, entityId])
+}

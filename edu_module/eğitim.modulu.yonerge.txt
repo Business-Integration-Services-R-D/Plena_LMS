@@ -1,0 +1,108 @@
+Martı Denizcilik projesi için yazılım ve ürün geliştirme ekibinize aktarabileceğiniz detaylı Analiz ve Kapsam Dokümanı (Functional & Technical Scope Document) aşağıdadır. Dokümanı doğrudan ekibinize iletebilir veya Jira / Confluence gibi proje yönetim araçlarınıza kopyalayabilirsiniz.
+
+📄 PROJE KAPSAM VE ANALİZ DOKÜMANI (BRD / FSD)
+
+Proje Adı: Martı Denizcilik – Cloud LMS (Eğitim Yönetim Sistemi)
+
+Hedef Kitle: Martı Denizcilik Kaptanları (50 Kullanıcı)
+
+Yönetici: 1 Sistem Yöneticisi (Admin)
+
+Mimari: Cloud (SaaS) Tabanlı Web Platformu
+
+1. PROJE ÖZETİ VE AMACI
+
+Martı Denizcilik bünyesindeki 50 kaptanın eğitim süreçlerini dijitalleştirmek, videoların izlenme durumunu garanti altına almak, video sonu testler ile öğrenmeyi doğrulamak ve denetim süreçleri için detaylı, değiştirilemez zaman damgalı log ve başarı raporları üretmektir.
+
+2. KULLANICI ROLLERİ VE YETKİLENDİRME (RBAC)
+
+2.1. Admin Panel (1 Kullanıcı)
+
+Kullanıcı Yönetimi: Kaptan hesaplarını tanımlama, şifre sıfırlama, durumunu (aktif/pasif) yönetme.
+
+Eğitim & İçerik Yönetimi: İçerik/video yükleme, kategorize etme ve atama yapma.
+
+Sınav Engine: Videolara özel çoktan seçmeli test/soru ekleme.
+
+Raporlama & Denetim Paneli: İzleme logları, test sonuçları ve denetim çıktılarını alma.
+
+2.2. Kaptan / Öğrenci Modülü (50 Kullanıcı)
+
+Kişisel Eğitim Listesi: Kendisine atanan eğitimleri ve durumlarını (Başlanmadı, Devam Ediyor, Tamamlandı) görme.
+
+Video Oynatıcı (Player): Videoyu izleme (İleri sarma kısıtlamalı).
+
+Test Ekranı: Video bittikten sonra açılan değerlendirme sınavını çözme.
+
+Başarı / Sertifika Durumu: Tamamladığı eğitimleri ve test puanlarını görüntüleme.
+
+3. FONKSİYONEL GEREKSİNİMLER (FUNCTIONAL REQUIREMENTS)
+
+3.1. İçerik ve Video Yönetimi
+
+Video Depolama ve Streaming:
+
+Toplam 100 adet ~5 dakikalık video güvenli cloud depolamada (S3 vb.) saklanacaktır.
+
+Müşteri harici platformlardaki videoları indirip sisteme yükleyecektir; doğrudan dosya yükleme (MP4 / WebM) arayüzü sağlanmalıdır.
+
+Video Player Kısıtlamaları (Mandatory Watch):
+
+Videolarda ileri sarma (seeking / fast-forward) engellenecektir.
+
+Kullanıcı videodan ayrılırsa veya sekmeyi kapatırsa kaldığı saniye kaydedilecek, tekrar açtığında kaldığı yerden devam edecektir.
+
+Video %100 izlenmeden test aşamasına geçişe izin verilmeyecektir.
+
+3.2. Sınav ve Doğrulama Modülü (Assessment Engine)
+
+Video Sonu Test Mantığı:
+
+Her video tamamlandığında sistem otomatik olarak ilgili test ekranına yönlendirecektir.
+
+Soru Yönetimi:
+
+Admin, her video için çoktan seçmeli sorular ve doğru yanıtları tanımlayabilmelidir.
+
+Test için geçme barajı (ör. %80) belirlenebilmelidir.
+
+Geçme / Tekrar Kuralı:
+
+Testi geçemeyen kaptan için durum "Başarısız" olarak işaretlenecek ve testi (veya videoyu) tekrar alma kuralı tetiklenecektir.
+
+3.3. Loglama ve Denetim Modülü (Audit & Compliance)
+
+Zaman Damgalı İzleme Logları (Time-stamped Logs):
+
+Kullanıcı ID, Video ID, Başlangıç Tarihi/Saati, Bitiş Tarihi/Saati, Toplam İzlenme Süresi (saniye detayında) kaydedilmelidir.
+
+Sınav Logları:
+
+Kullanıcı ID, Test ID, Deneme Sayısı, Aldığı Puan, Doğru/Yanlış Sayıları ve Tamamlama Tarihi tutulmalıdır.
+
+Raporlama ve Export:
+
+Denetimlerde kullanılmak üzere tüm bu veriler Kullanıcı Bazlı, Eğitim Bazlı veya Tarih Aralığı Filtreli olarak PDF ve Excel (.xlsx) formatında aktarılabilmelidir.
+
+4. TEKNİK MİMARİ VE GEREKSİNİMLER (TECHNICAL REQUIREMENTS)
+
+Cloud Altyapısı: AWS / GCP / Azure veya eşdeğer ölçeklenebilir cloud sunucu.
+
+Frontend: Responsive web tasarımı (Masaüstü ve Tablet cihazlarla %100 uyumlu UI/UX).
+
+Backend & Database:
+
+Relational DB (PostgreSQL / MySQL) - Kullanıcı, eğitim, test ve log ilişkileri için.
+
+NoSQL / Log DB (İsteğe bağlı) - Yüksek hacimli izleme/event logları için.
+
+Video CDN / Object Storage: Videos altyapısının hızlı ve kesintisiz yüklenebilmesi için CDN destekli depolama (örn. AWS S3 + CloudFront).
+
+Güvenlik:
+
+SSL / HTTPS zorunluluğu.
+
+KVKK / GDPR uyumlu veri saklama ilkeleri.
+
+Video içeriklerinin doğrudan indirilmesini engellemek adına imzalı URL (Signed URL) yapısı.
+ 

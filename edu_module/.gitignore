@@ -1,0 +1,17 @@
+node_modules
+.next
+.env
+.env.local
+dist
+coverage
+*.log
+.DS_Store
+apps/web/.env
+apps/web/prisma/*.db
+apps/web/prisma/*.db-journal
+apps/web/storage/
+seed-assets/*.mp4
+!seed-assets/.gitkeep
+
+# Lokal taşınabilir araçlar (gömülü PostgreSQL)
+.tools/
