@@ -2,16 +2,40 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, fmtTime, fmtDate } from "@/lib/api";
 import { PageHeader } from "@/components/Layout";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PlayCircle, CheckCircle2, Clock, FileQuestion } from "lucide-react";
 
 export default function MyTrainingsPage() {
   const [assignments, setAssignments] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [infoModal, setInfoModal] = useState(null); // tıklanan tamamlanmamış eğitim
   const navigate = useNavigate();
 
   useEffect(() => {
     api.get("/my/assignments").then((r) => { setAssignments(r.data); setLoaded(true); });
   }, []);
+
+  const openTraining = (a) => {
+    if (a.status === "completed") {
+      navigate(`/trainings/${a.assignment_id}/watch`);
+      return;
+    }
+    setInfoModal(a);
+  };
+
+  // Kontrol noktası / sınav durumuna göre bilgilendirme cümlesi
+  const infoText = (a) => {
+    if (!a) return "";
+    const cp = a.checkpoint_count || 0;
+    const q = a.quiz_question_count || 0;
+    if (cp > 0 && q > 0)
+      return `Bu eğitimde ${cp} kontrol noktası sorusu bulunmaktadır ve videoyu tamamladığınızda ${q} soruluk bir sınavı tamamlamanız gerekmektedir.`;
+    if (cp > 0)
+      return `Bu eğitimde ${cp} kontrol noktası sorusu bulunmaktadır.`;
+    if (q > 0)
+      return `Videoyu tamamladığınızda ${q} soruluk bir sınavı tamamlamanız gerekmektedir.`;
+    return "Bu eğitimi tamamlamak için videoyu sonuna kadar izlemeniz gerekmektedir.";
+  };
 
   return (
     <div className="fade-up" data-testid="my-trainings-page">
@@ -32,7 +56,7 @@ export default function MyTrainingsPage() {
             <div
               key={a.assignment_id}
               data-testid={`my-training-card-${a.assignment_id}`}
-              onClick={() => navigate(`/trainings/${a.assignment_id}/watch`)}
+              onClick={() => openTraining(a)}
               className="n-card n-card-hover p-6 cursor-pointer fade-up"
               style={{ animationDelay: `${i * 60}ms` }}
             >
@@ -64,6 +88,27 @@ export default function MyTrainingsPage() {
           );
         })}
       </div>
+
+      {/* Tamamlanmamış eğitime tıklanınca bilgilendirme popup'ı */}
+      <Dialog open={!!infoModal} onOpenChange={(o) => !o && setInfoModal(null)}>
+        <DialogContent className="rounded-2xl max-w-md" data-testid="training-info-modal">
+          <DialogHeader>
+            <DialogTitle>{infoModal?.training_title}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-gray-600 leading-relaxed mt-2">{infoText(infoModal)}</p>
+          <button
+            data-testid="continue-training-btn"
+            className="w-full mt-4 py-3 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-[background-color,transform]"
+            onClick={() => {
+              const id = infoModal.assignment_id;
+              setInfoModal(null);
+              navigate(`/trainings/${id}/watch`);
+            }}
+          >
+            Eğitime devam et
+          </button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

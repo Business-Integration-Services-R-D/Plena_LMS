@@ -50,7 +50,9 @@ export default function WatchPage() {
       const res = await api.post(`/learn/${assignmentId}/video-complete`);
       if (res.data.has_quiz) {
         toast.success("Video tamamlandı! Şimdi sınav zamanı.");
-        setStage("quiz");
+        // Sınav soruları video tamamlandıktan sonra erişilebilir olur;
+        // veriyi yeniden yükleyerek soruları al (stage'i load belirler).
+        await load();
       } else {
         toast.success("Eğitim tamamlandı!");
         setStage("done");
@@ -58,7 +60,7 @@ export default function WatchPage() {
     } catch (e) {
       toast.error(e.response?.data?.detail || "Video tamamlanamadı");
     }
-  }, [assignmentId]);
+  }, [assignmentId, load]);
 
   const submitQuiz = async () => {
     setSubmitting(true);
@@ -114,7 +116,7 @@ export default function WatchPage() {
             <p className="text-sm text-gray-500">
               Süre: <span className="font-medium text-gray-900">{fmtTime(training.duration)}</span>
             </p>
-            {quiz && <p className="text-sm text-gray-500">Video sonunda <span className="font-medium text-gray-900">{quiz.questions.length} soruluk sınav</span> var</p>}
+            {quiz && <p className="text-sm text-gray-500">Video sonunda <span className="font-medium text-gray-900">{quiz.question_count ?? quiz.questions.length} soruluk sınav</span> var</p>}
             <p className="text-xs text-gray-400 ml-auto">İleri sarma kapalıdır · İzlemeniz kayıt altına alınır</p>
           </div>
         </div>

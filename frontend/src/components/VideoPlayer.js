@@ -16,6 +16,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
   const [countdown, setCountdown] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [seekBlocked, setSeekBlocked] = useState(false);
+  const [retryMsg, setRetryMsg] = useState(null);
   const startedRef = useRef(false);
 
   const dur = duration || videoRef.current?.duration || 0;
@@ -32,7 +33,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
           setMaxPos(res.max_position);
         }
       } catch {}
-    }, 8000);
+    }, 2000);
     return () => clearInterval(iv);
   }, [onHeartbeat]);
 
@@ -50,7 +51,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
 
   // checkpoint countdown
   useEffect(() => {
-    if (!activeCp || countdown <= 0) return;
+    if (!activeCp || countdown == null || countdown <= 0) return;
     const t = setTimeout(() => {
       if (countdown === 1) submitCheckpoint(true);
       else setCountdown((c) => c - 1);
@@ -65,7 +66,9 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
     activeCpRef.current = cp;
     setActiveCp(cp);
     setAnswer({ index: null, text: "" });
-    setCountdown(cp.timeout_seconds || 60);
+    setRetryMsg(null);
+    // null = süre sınırı yok (geri sayım gösterilmez)
+    setCountdown(cp.timeout_seconds ?? null);
   }, []);
 
   const handleTimeUpdate = () => {
@@ -112,6 +115,15 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
         setActiveCp(null);
         v.play();
         setPlaying(true);
+      } else if (res.retry) {
+        // Video sarılmaz; soru tekrar sorulur.
+        setAnswer({ index: null, text: "" });
+        setCountdown(cp.timeout_seconds ?? null);
+        setRetryMsg(
+          res.remaining != null
+            ? `Yanlış cevap. Kalan deneme hakkı: ${res.remaining}`
+            : "Yanlış cevap, tekrar deneyin."
+        );
       } else {
         maxRef.current = res.rewind_to;
         setMaxPos(res.rewind_to);
@@ -230,11 +242,16 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
           <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-5">
               <p className="text-xs uppercase tracking-[0.2em] font-medium text-gray-400">Kontrol Noktası</p>
-              <span className={`text-sm font-semibold tabular-nums px-3 py-1 rounded-full ${countdown <= 10 ? "bg-red-50 text-red-500" : "bg-gray-100 text-gray-600"}`} data-testid="checkpoint-countdown">
-                {countdown}s
-              </span>
+              {countdown != null && (
+                <span className={`text-sm font-semibold tabular-nums px-3 py-1 rounded-full ${countdown <= 10 ? "bg-red-50 text-red-500" : "bg-gray-100 text-gray-600"}`} data-testid="checkpoint-countdown">
+                  {countdown}s
+                </span>
+              )}
             </div>
             <p className="text-lg font-medium tracking-tight text-gray-900 mb-6">{q.text}</p>
+            {retryMsg && (
+              <p className="text-sm font-medium text-red-500 -mt-3 mb-5" data-testid="checkpoint-retry-msg">{retryMsg}</p>
+            )}
             {q.qtype === "multiple_choice" ? (
               <div className="space-y-2 mb-6">
                 {q.options.map((o, i) => (

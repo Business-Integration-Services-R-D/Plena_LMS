@@ -1,8 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 
-const AUTH_BYPASS = process.env.REACT_APP_AUTH_BYPASS === "true";
-
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -14,37 +12,23 @@ export const AuthProvider = ({ children }) => {
       const res = await api.get("/auth/me");
       setUser(res.data);
     } catch {
-      if (AUTH_BYPASS) {
-        try {
-          const res = await api.post("/auth/dev-login?role=admin");
-          setUser(res.data);
-          return;
-        } catch {
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
+      setUser(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    // CRITICAL: If returning from OAuth callback, skip the /me check.
-    // AuthCallback will exchange the session_id and establish the session first.
-    if (window.location.hash?.includes("session_id=")) {
-      setLoading(false);
-      return;
-    }
     checkAuth();
   }, [checkAuth]);
 
+  const login = async (email, password) => {
+    const res = await api.post("/auth/login", { email, password });
+    setUser(res.data);
+    return res.data;
+  };
+
   const logout = async () => {
-    if (AUTH_BYPASS) {
-      // Stay signed in for local bypass mode.
-      return;
-    }
     try {
       await api.post("/auth/logout");
     } catch {}
@@ -53,7 +37,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, logout }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
