@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { EnrollmentStatus, Prisma, Role } from "@prisma/client";
+import { EnrollmentStatus, Prisma, Role, WatchEventType } from "@prisma/client";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { refreshOverdue } from "@/lib/enrollment";
@@ -55,6 +55,49 @@ export async function GET(req: NextRequest) {
     take: 1000,
   });
 
+  // Kontrol noktası istatistikleri: kurs başına toplam, kayıt başına geçilen
+  // (tekil) ve başarısız deneme sayısı.
+  const courseIds = [...new Set(enrollments.map((e) => e.course.id))];
+  const checkpointTotals = new Map<string, number>();
+  if (courseIds.length > 0) {
+    const grouped = await prisma.checkpoint.groupBy({
+      by: ["courseId"],
+      where: { courseId: { in: courseIds } },
+      _count: { _all: true },
+    });
+    for (const g of grouped) checkpointTotals.set(g.courseId, g._count._all);
+  }
+
+  const enrollmentIds = enrollments.map((e) => e.id);
+  const passedByEnrollment = new Map<string, Set<string>>();
+  const failsByEnrollment = new Map<string, number>();
+  if (enrollmentIds.length > 0) {
+    const cpEvents = await prisma.watchEvent.findMany({
+      where: {
+        enrollmentId: { in: enrollmentIds },
+        eventType: {
+          in: [WatchEventType.CHECKPOINT_PASSED, WatchEventType.CHECKPOINT_FAILED],
+        },
+      },
+      select: { enrollmentId: true, eventType: true, metadata: true },
+    });
+    for (const ev of cpEvents) {
+      if (ev.eventType === WatchEventType.CHECKPOINT_FAILED) {
+        failsByEnrollment.set(
+          ev.enrollmentId,
+          (failsByEnrollment.get(ev.enrollmentId) ?? 0) + 1,
+        );
+      } else {
+        const cpId = (ev.metadata as { checkpointId?: string } | null)?.checkpointId;
+        if (!cpId) continue;
+        if (!passedByEnrollment.has(ev.enrollmentId)) {
+          passedByEnrollment.set(ev.enrollmentId, new Set());
+        }
+        passedByEnrollment.get(ev.enrollmentId)!.add(cpId);
+      }
+    }
+  }
+
   const summary = {
     total: enrollments.length,
     notStarted: 0,
@@ -98,6 +141,9 @@ export async function GET(req: NextRequest) {
       wrongCount: e.lastWrongCount,
       bestScorePercent: e.bestScorePercent,
       passed: e.passed,
+      checkpointsTotal: checkpointTotals.get(e.course.id) ?? 0,
+      checkpointsPassed: passedByEnrollment.get(e.id)?.size ?? 0,
+      checkpointFails: failsByEnrollment.get(e.id) ?? 0,
     })),
   });
 }

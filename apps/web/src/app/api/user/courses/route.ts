@@ -19,12 +19,21 @@ export async function GET() {
       course: {
         include: {
           video: true,
-          questionPool: { select: { _count: { select: { questions: true } } } },
-          exam: {
-            include: {
-              questionPool: { select: { _count: { select: { questions: true } } } },
+          questionPool: {
+            select: {
+              _count: { select: { questions: { where: { active: true } } } },
             },
           },
+          exam: {
+            include: {
+              questionPool: {
+                select: {
+                  _count: { select: { questions: { where: { active: true } } } },
+                },
+              },
+            },
+          },
+          _count: { select: { checkpoints: true } },
         },
       },
       quizAttempts: { orderBy: { completedAt: "desc" }, take: 1 },
@@ -61,6 +70,7 @@ export async function GET() {
           maxAttempts: settings.maxAttempts,
           durationSec: e.course.video?.durationSec ?? 0,
           questionCount: effectiveQuestionCount(settings, poolTotal),
+          checkpointCount: e.course._count.checkpoints,
         },
         latestAttempt: e.quizAttempts[0] ?? null,
       };

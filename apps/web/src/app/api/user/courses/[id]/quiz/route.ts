@@ -80,6 +80,7 @@ export async function GET(
     questions: questions.map((q) => ({
       id: q.id,
       prompt: q.prompt,
+      type: q.type,
       choices: q.choices.map((c) => ({ id: c.id, text: c.text })),
     })),
   });
@@ -89,7 +90,8 @@ const submitSchema = z.object({
   answers: z.array(
     z.object({
       questionId: z.string(),
-      choiceId: z.string(),
+      choiceId: z.string().optional(),
+      textAnswer: z.string().optional(),
     }),
   ),
 });
@@ -138,6 +140,7 @@ export async function POST(
         create: graded.answers.map((a) => ({
           questionId: a.questionId,
           choiceId: a.choiceId,
+          textAnswer: a.textAnswer,
           isCorrect: a.isCorrect,
         })),
       },

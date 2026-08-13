@@ -23,10 +23,26 @@ export async function GET(
       course: {
         include: {
           video: true,
-          questionPool: { select: { _count: { select: { questions: true } } } },
+          checkpoints: {
+            orderBy: { timeSec: "asc" },
+            include: {
+              question: {
+                include: { choices: { select: { id: true, text: true } } },
+              },
+            },
+          },
+          questionPool: {
+            select: {
+              _count: { select: { questions: { where: { active: true } } } },
+            },
+          },
           exam: {
             include: {
-              questionPool: { select: { _count: { select: { questions: true } } } },
+              questionPool: {
+                select: {
+                  _count: { select: { questions: { where: { active: true } } } },
+                },
+              },
             },
           },
         },
@@ -64,6 +80,22 @@ export async function GET(
     },
   });
 
+  // Bu kayıtta daha önce geçilen kontrol noktaları (WatchEvent üzerinden).
+  const passedEvents = await prisma.watchEvent.findMany({
+    where: {
+      enrollmentId: enrollment.id,
+      eventType: WatchEventType.CHECKPOINT_PASSED,
+    },
+    select: { metadata: true },
+  });
+  const passedCheckpointIds = [
+    ...new Set(
+      passedEvents
+        .map((e) => (e.metadata as { checkpointId?: string } | null)?.checkpointId)
+        .filter((v): v is string => Boolean(v)),
+    ),
+  ];
+
   const settings = resolveExamSettings(enrollment.course, enrollment.course.exam);
   const poolTotal =
     enrollment.course.exam?.questionPool?._count.questions ??
@@ -83,6 +115,18 @@ export async function GET(
       durationSec: enrollment.course.video.durationSec,
       url: `/api/user/courses/${courseId}/video`,
     },
+    checkpoints: enrollment.course.checkpoints.map((cp) => ({
+      id: cp.id,
+      timeSec: cp.timeSec,
+      timeoutSeconds: cp.timeoutSeconds,
+      onFail: cp.onFail,
+      question: {
+        id: cp.question.id,
+        prompt: cp.question.prompt,
+        choices: cp.question.choices,
+      },
+    })),
+    passedCheckpointIds,
     progress: {
       positionSec: enrollment.positionSec,
       maxReachedSec: enrollment.maxReachedSec,

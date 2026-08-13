@@ -36,11 +36,23 @@ enum WatchEventType {
   SEEK_BLOCKED
   EXIT
   COMPLETE
+  CHECKPOINT_PASSED
+  CHECKPOINT_FAILED
 }
 
 /// Soru tipi. Şimdilik tek tip var; model ileride genişlemeye açık.
 enum QuestionType {
   MULTIPLE_CHOICE
+  /// Doğru/yanlış cevabı olmayan açık uçlu soru; puanlamaya dahil edilmez.
+  FREE_TEXT
+}
+
+/// Kontrol noktasında başarısız olunca uygulanacak politika.
+/// RETRY: video sarılmaz, soru tekrar sorulur (maxAttempts null ise sınırsız).
+enum CheckpointOnFail {
+  START
+  PREVIOUS
+  RETRY
 }
 
 /// Testi geçemeyen kullanıcının tekrar denerken ne yapması gerektiği.
@@ -58,7 +70,9 @@ enum AuditAction {
   ADMIN_UPDATED_USER
   ADMIN_CHANGED_USER_STATUS
   ADMIN_CREATED_COURSE
+  ADMIN_UPDATED_COURSE
   ADMIN_CREATED_GROUP
+  ADMIN_UPDATED_GROUP
   ADMIN_ADDED_GROUP_MEMBER
   ADMIN_REMOVED_GROUP_MEMBER
   ADMIN_ASSIGNED_COURSE
@@ -147,9 +161,10 @@ model Question {
   active    Boolean      @default(true)
   createdAt DateTime     @default(now())
 
-  pool    QuestionPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
-  choices Choice[]
-  answers QuizAnswer[]
+  pool        QuestionPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  choices     Choice[]
+  answers     QuizAnswer[]
+  checkpoints Checkpoint[]
 
   @@index([poolId, sortOrder])
 }
@@ -208,6 +223,7 @@ model Course {
   questionPool QuestionPool? @relation(fields: [questionPoolId], references: [id], onDelete: SetNull)
   exam         Exam?
   video        Video?
+  checkpoints  Checkpoint[]
   assignments  Assignment[]
   enrollments  Enrollment[]
   quizAttempts QuizAttempt[]
@@ -244,6 +260,27 @@ model Exam {
   attempts     QuizAttempt[]
 
   @@index([questionPoolId])
+}
+
+/// Video içi kontrol noktası: video belirtilen saniyede durur ve soru sorar.
+/// Yanlış cevap/süre aşımı videoyu başa veya önceki noktaya sarar.
+model Checkpoint {
+  id             String           @id @default(cuid())
+  courseId       String
+  questionId     String
+  timeSec        Int
+  /// null = süre sınırı yok.
+  timeoutSeconds Int?
+  onFail         CheckpointOnFail @default(START)
+  /// Yalnızca RETRY için anlamlı: null = doğru yapana kadar sınırsız deneme.
+  /// Sayı verilirse hak bitince video başa sarılır.
+  maxAttempts    Int?
+  createdAt      DateTime         @default(now())
+
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([courseId, timeSec])
 }
 
 model Video {
@@ -408,6 +445,8 @@ model QuizAnswer {
   attemptId  String
   questionId String
   choiceId   String?
+  /// Serbest metin sorularının cevabı.
+  textAnswer String?
   isCorrect  Boolean @default(false)
 
   attempt  QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)

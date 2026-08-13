@@ -28,16 +28,25 @@ export async function GET(
     where: { userId_courseId: { userId: session.id, courseId } },
     include: { course: { include: { video: true } } },
   });
-  if (!enrollment) {
+
+  let video = enrollment?.course.video ?? null;
+
+  if (enrollment) {
+    const window = checkWindow(enrollment);
+    if (!window.open) {
+      return NextResponse.json({ error: window.reason }, { status: 403 });
+    }
+  } else if (session.role === Role.ADMIN) {
+    // Admin önizlemesi: atama şartı aranmaz.
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      include: { video: true },
+    });
+    video = course?.video ?? null;
+  } else {
     return NextResponse.json({ error: "Atama yok" }, { status: 403 });
   }
 
-  const window = checkWindow(enrollment);
-  if (!window.open) {
-    return NextResponse.json({ error: window.reason }, { status: 403 });
-  }
-
-  const video = enrollment.course.video;
   if (!video) {
     return NextResponse.json({ error: "Video yok" }, { status: 404 });
   }

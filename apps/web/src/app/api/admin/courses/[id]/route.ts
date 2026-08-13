@@ -1,0 +1,91 @@
+import { NextRequest, NextResponse } from "next/server";
+import { AuditAction, Role } from "@prisma/client";
+import { z } from "zod";
+import { requireSession } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
+
+const schema = z.object({
+  title: z.string().min(2).optional(),
+  description: z.string().optional(),
+  active: z.boolean().optional(),
+  passPercent: z.number().min(0).max(100).optional(),
+  questionPoolId: z.string().min(1).optional(),
+});
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await requireSession([Role.ADMIN]);
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { id } = await params;
+  const parsed = schema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Geçersiz veri" }, { status: 400 });
+  }
+
+  const course = await prisma.course.findUnique({
+    where: { id },
+    include: { exam: true },
+  });
+  if (!course) {
+    return NextResponse.json({ error: "Eğitim bulunamadı" }, { status: 404 });
+  }
+
+  const { passPercent, questionPoolId, ...courseData } = parsed.data;
+
+  if (questionPoolId) {
+    const pool = await prisma.questionPool.findUnique({
+      where: { id: questionPoolId },
+    });
+    if (!pool) {
+      return NextResponse.json({ error: "Soru havuzu bulunamadı" }, { status: 404 });
+    }
+  }
+
+  const updated = await prisma.course.update({
+    where: { id },
+    data: {
+      ...courseData,
+      // Geriye dönük uyumluluk: baraj/havuz Course üzerindeki eski alanlara da yazılır.
+      ...(passPercent !== undefined ? { passPercent } : {}),
+      ...(questionPoolId ? { questionPoolId } : {}),
+    },
+  });
+
+  if ((passPercent !== undefined || questionPoolId) && course.exam) {
+    await prisma.exam.update({
+      where: { id: course.exam.id },
+      data: {
+        ...(passPercent !== undefined ? { passPercent } : {}),
+        ...(questionPoolId ? { questionPoolId } : {}),
+      },
+    });
+  }
+
+  await recordAudit({
+    action: AuditAction.ADMIN_UPDATED_COURSE,
+    actor: session,
+    entityType: "Course",
+    entityId: updated.id,
+    metadata: {
+      title: updated.title,
+      ...(parsed.data.active !== undefined
+        ? { from: course.active, to: updated.active }
+        : {}),
+      ...(passPercent !== undefined ? { passPercent } : {}),
+    },
+  });
+
+  return NextResponse.json({
+    id: updated.id,
+    title: updated.title,
+    description: updated.description,
+    active: updated.active,
+    passPercent: updated.passPercent,
+  });
+}

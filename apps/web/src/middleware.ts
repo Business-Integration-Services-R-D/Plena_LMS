@@ -9,12 +9,51 @@ function secretKey() {
   );
 }
 
+function allowedOrigins(): string[] {
+  return (process.env.CORS_ALLOWED_ORIGINS || "http://localhost:3000")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Emergent UI ayrı origin'de (CRA, :3000) çalıştığı için /api/* isteklerinde
+// credentials destekli CORS gerekir.
+function withCors(res: NextResponse, req: NextRequest) {
+  const origin = req.headers.get("origin");
+  if (origin && allowedOrigins().includes(origin)) {
+    res.headers.set("Access-Control-Allow-Origin", origin);
+    res.headers.set("Access-Control-Allow-Credentials", "true");
+    // Dosya indirmelerinde (rapor export) dosya adının okunabilmesi için.
+    res.headers.set("Access-Control-Expose-Headers", "Content-Disposition");
+    res.headers.append("Vary", "Origin");
+  }
+  return res;
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const isApi = pathname.startsWith("/api/");
+
+  if (isApi && req.method === "OPTIONS") {
+    const res = new NextResponse(null, { status: 204 });
+    res.headers.set(
+      "Access-Control-Allow-Methods",
+      "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+    );
+    res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.headers.set("Access-Control-Max-Age", "86400");
+    return withCors(res, req);
+  }
+
+  const res = await handle(req, pathname, isApi);
+  return isApi ? withCors(res, req) : res;
+}
+
+async function handle(req: NextRequest, pathname: string, isApi: boolean) {
   const isAdmin = pathname.startsWith("/admin");
   const isUserArea = pathname.startsWith("/user");
   const isProtectedApi =
-    pathname.startsWith("/api/") &&
+    isApi &&
     !pathname.startsWith("/api/auth/login") &&
     !pathname.startsWith("/api/health");
 
@@ -24,7 +63,7 @@ export async function middleware(req: NextRequest) {
 
   const token = req.cookies.get(COOKIE_NAME)?.value;
   if (!token) {
-    if (pathname.startsWith("/api/")) {
+    if (isApi) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     return NextResponse.redirect(new URL("/login", req.url));
@@ -46,7 +85,7 @@ export async function middleware(req: NextRequest) {
 
     return NextResponse.next();
   } catch {
-    if (pathname.startsWith("/api/")) {
+    if (isApi) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     return NextResponse.redirect(new URL("/login", req.url));

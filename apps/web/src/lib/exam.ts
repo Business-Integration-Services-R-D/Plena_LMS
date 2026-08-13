@@ -118,6 +118,7 @@ export function checkExamGate(
 export type GradedAnswer = {
   questionId: string;
   choiceId: string | null;
+  textAnswer: string | null;
   isCorrect: boolean;
 };
 
@@ -131,34 +132,55 @@ export type GradedAttempt = {
 
 /**
  * Cevapları puanlar. Cevaplanmamış veya doğru şıkkı tanımsız soru yanlış sayılır.
+ * Serbest metin (FREE_TEXT) soruların doğru cevabı yoktur; cevap kaydedilir
+ * ama puanlamaya dahil edilmez.
  */
 export function gradeAttempt(
-  questions: Array<{ id: string; choices: Array<{ id: string; isCorrect: boolean }> }>,
-  submitted: Array<{ questionId: string; choiceId: string }>,
+  questions: Array<{
+    id: string;
+    type?: "MULTIPLE_CHOICE" | "FREE_TEXT";
+    choices: Array<{ id: string; isCorrect: boolean }>;
+  }>,
+  submitted: Array<{ questionId: string; choiceId?: string | null; textAnswer?: string | null }>,
   passPercent: number,
 ): GradedAttempt {
   const answers: GradedAnswer[] = questions.map((question) => {
     const given = submitted.find((a) => a.questionId === question.id);
+    if (question.type === "FREE_TEXT") {
+      return {
+        questionId: question.id,
+        choiceId: null,
+        textAnswer: given?.textAnswer?.trim() || null,
+        isCorrect: false,
+      };
+    }
     const correctChoice = question.choices.find((c) => c.isCorrect);
     return {
       questionId: question.id,
       choiceId: given?.choiceId ?? null,
+      textAnswer: null,
       isCorrect: Boolean(
         given && correctChoice && given.choiceId === correctChoice.id,
       ),
     };
   });
 
-  const correctCount = answers.filter((a) => a.isCorrect).length;
+  // Puanlama yalnızca çoktan seçmeli sorular üzerinden yapılır.
+  const scorableIds = new Set(
+    questions.filter((q) => q.type !== "FREE_TEXT").map((q) => q.id),
+  );
+  const scorable = answers.filter((a) => scorableIds.has(a.questionId));
+  const correctCount = scorable.filter((a) => a.isCorrect).length;
   const scorePercent =
-    answers.length > 0 ? (correctCount / answers.length) * 100 : 0;
+    scorable.length > 0 ? (correctCount / scorable.length) * 100 : 100;
 
   return {
     answers,
     correctCount,
-    wrongCount: answers.length - correctCount,
+    wrongCount: scorable.length - correctCount,
     scorePercent,
-    passed: answers.length > 0 && scorePercent >= passPercent,
+    // Puanlanabilir soru yoksa (tümü serbest metin) sınav geçilmiş sayılır.
+    passed: scorable.length === 0 || scorePercent >= passPercent,
   };
 }
 
