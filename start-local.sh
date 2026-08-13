@@ -3,19 +3,19 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 export PATH="$ROOT/.tools/node/bin:$PATH"
 
-PGBIN="$ROOT/edu_module/.tools/pg/node_modules/@embedded-postgres/darwin-arm64/native/bin"
-PGDATA="$ROOT/edu_module/.tools/pg/data"
+PGBIN="$ROOT/.tools/pg/node_modules/@embedded-postgres/darwin-arm64/native/bin"
+PGDATA="$ROOT/.tools/pg/data"
 
 if "$PGBIN/pg_ctl" -D "$PGDATA" status >/dev/null 2>&1; then
   echo "PostgreSQL zaten calisiyor (:5432)"
 else
-  "$PGBIN/pg_ctl" -D "$PGDATA" -l "$ROOT/edu_module/.tools/pg/pg.log" start
+  "$PGBIN/pg_ctl" -D "$PGDATA" -l "$ROOT/.tools/pg/pg.log" start
   echo "PostgreSQL basladi (:5432)"
 fi
 
 echo "API basliyor (:3001) ..."
 (
-  cd "$ROOT/edu_module/apps/web"
+  cd "$ROOT/backend"
   npm run dev -- -p 3001
 ) &
 

@@ -3,9 +3,10 @@
 Tek repo, iki katman:
 
 - `frontend/` — Plena arayüzü (CRA, http://localhost:3000). Kullanıcıların gördüğü tek arayüz budur.
-- `edu_module/` — Martı LMS backend'i (Next.js API + Prisma + PostgreSQL, http://localhost:3001). Sadece API olarak kullanılır; kendi sayfaları artık kullanılmaz.
+- `backend/` — LMS backend'i (Next.js API + Prisma + PostgreSQL, http://localhost:3001). Sadece API olarak kullanılır; kendi sayfaları artık kullanılmaz.
+- `docs/` — proje dokümanları (PRD, yönerge, sunum, tasarım notları).
 
-`frontend/src/lib/api.js`, arayüzün beklediği eski FastAPI sözleşmesini edu_module API'sine çeviren adapter'dır.
+`frontend/src/lib/api.js`, arayüzün beklediği eski FastAPI sözleşmesini backend API'sine çeviren adapter'dır.
 
 ## Çalıştırma
 
@@ -13,7 +14,7 @@ Tek repo, iki katman:
 ./start-local.sh
 ```
 
-Script sırasıyla gömülü PostgreSQL'i (:5432), edu_module API'sini (:3001) ve arayüzü (:3000) başlatır.
+Script sırasıyla gömülü PostgreSQL'i (:5432), backend API'sini (:3001) ve arayüzü (:3000) başlatır.
 
 Giriş: http://localhost:3000
 
@@ -25,12 +26,12 @@ Giriş: http://localhost:3000
 ## Veritabanını sıfırlama / ilk kurulum
 
 ```bash
-cd edu_module/apps/web
+cd backend
 npm run db:setup   # prisma db push + demo verisi
 ```
 
 ## Notlar
 
-- Ortam dosyaları gitignore'dadır: `frontend/.env` (`REACT_APP_BACKEND_URL=http://localhost:3001`) ve `edu_module/apps/web/.env` (`DATABASE_URL`, `CORS_ALLOWED_ORIGINS=http://localhost:3000` vb.).
-- Yüklenen videolar `edu_module/apps/web/storage/videos/` altında, veritabanı verisi `edu_module/.tools/pg/data/` altında tutulur; ikisi de gitignore'dadır.
-- Eski FastAPI + MongoDB backend'i bu branch'te kaldırılmıştır.
+- Ortam dosyaları gitignore'dadır: `frontend/.env` (`REACT_APP_BACKEND_URL=http://localhost:3001`) ve `backend/.env` (`DATABASE_URL`, `CORS_ALLOWED_ORIGINS=http://localhost:3000` vb.).
+- Yüklenen videolar `backend/storage/videos/` altında, veritabanı verisi `.tools/pg/data/` altında tutulur; ikisi de gitignore'dadır.
+- `backend/docker-compose.yml` Postgres + MinIO + Caddy ile konteynerli kurulum içindir (lokal geliştirmede kullanılmaz).

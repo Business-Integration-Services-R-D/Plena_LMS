@@ -41,7 +41,7 @@ services:
 
   web:
     build:
-      context: ./apps/web
+      context: .
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgresql://marti:marti@db:5432/marti_lms
