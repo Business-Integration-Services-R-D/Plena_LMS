@@ -120,7 +120,7 @@ export default function ReportsPage() {
                   <th className="px-4 py-3 font-medium">İzleme</th>
                   <th className="px-4 py-3 font-medium">İzleme Süresi</th>
                   <th className="px-4 py-3 font-medium">Kontrol N.</th>
-                  <th className="px-4 py-3 font-medium">Hata</th>
+                  <th className="px-4 py-3 font-medium">Kontrol Noktası Hatası</th>
                   <th className="px-4 py-3 font-medium">Sınav</th>
                   <th className="px-4 py-3 font-medium">Tamamlanma</th>
                   <th className="px-4 py-3"></th>

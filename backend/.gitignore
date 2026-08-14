@@ -1,0 +1,13 @@
+node_modules
+.next
+.env
+.env.local
+dist
+coverage
+*.log
+.DS_Store
+prisma/*.db
+prisma/*.db-journal
+storage/
+seed-assets/*.mp4
+!seed-assets/.gitkeep

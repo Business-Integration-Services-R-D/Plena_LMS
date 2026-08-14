@@ -14,7 +14,7 @@ export default function UsersPage() {
   const [groups, setGroups] = useState([]);
   const [userModal, setUserModal] = useState(false);
   const [groupModal, setGroupModal] = useState(null); // null | {group or new}
-  const [form, setForm] = useState({ email: "", name: "", role: "employee" });
+  const [form, setForm] = useState({ email: "", name: "", role: "employee", password: "" });
   const [groupForm, setGroupForm] = useState({ name: "", member_ids: [] });
 
   const load = useCallback(() => {
@@ -26,9 +26,9 @@ export default function UsersPage() {
   const createUser = async () => {
     try {
       await api.post("/users", form);
-      toast.success("Kullanıcı oluşturuldu, aktivasyon maili gönderildi (mock)");
+      toast.success("Kullanıcı oluşturuldu");
       setUserModal(false);
-      setForm({ email: "", name: "", role: "employee" });
+      setForm({ email: "", name: "", role: "employee", password: "" });
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Kullanıcı oluşturulamadı");
@@ -195,13 +195,14 @@ export default function UsersPage() {
           <DialogHeader><DialogTitle>Yeni Kullanıcı</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <input data-testid="user-name-input" className={inputCls} placeholder="Ad Soyad" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <input data-testid="user-email-input" className={inputCls} placeholder="E-posta (Google hesabı)" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <input data-testid="user-email-input" className={inputCls} placeholder="E-posta" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            <input data-testid="user-password-input" type="password" className={inputCls} placeholder="Şifre (en az 6 karakter)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
             <select data-testid="user-role-select" className={inputCls} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
               <option value="employee">Çalışan</option>
               <option value="admin">Yönetici</option>
             </select>
-            <button data-testid="user-save-btn" className={btnPrimary + " w-full"} disabled={!form.email || !form.name} onClick={createUser}>
-              Oluştur & Aktivasyon Gönder
+            <button data-testid="user-save-btn" className={btnPrimary + " w-full"} disabled={!form.email || !form.name || form.password.length < 6} onClick={createUser}>
+              Oluştur
             </button>
           </div>
         </DialogContent>
