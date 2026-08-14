@@ -8,6 +8,24 @@ Tek repo, iki katman:
 
 `frontend/src/lib/api.js`, arayüzün beklediği eski FastAPI sözleşmesini backend API'sine çeviren adapter'dır.
 
+## İlk kurulum
+
+Repoyu ilk defa kuran biri için tek komut yeterlidir (macOS Apple Silicon):
+
+```bash
+git clone https://github.com/aslinuralkan/Plena_LMS.git
+cd Plena_LMS
+./setup.sh
+```
+
+Script şunları yapar (idempotenttir, tekrar çalıştırmak güvenlidir):
+
+1. Node.js v22'yi `.tools/node` altına indirir (sistemde Node kurulu olması gerekmez) ve corepack ile yarn'ı etkinleştirir.
+2. Gömülü PostgreSQL'i `.tools/pg` altına kurar ve veritabanı dizinini oluşturur.
+3. `backend/.env` ve `frontend/.env` dosyalarını `.env.example` şablonlarından üretir (`AUTH_SECRET` otomatik oluşturulur).
+4. Backend (`npm install`) ve frontend (`yarn install`) bağımlılıklarını kurar.
+5. Veritabanı şemasını ve demo verileri yükler (`npm run db:setup`).
+
 ## Çalıştırma
 
 ```bash
@@ -32,6 +50,6 @@ npm run db:setup   # prisma db push + demo verisi
 
 ## Notlar
 
-- Ortam dosyaları gitignore'dadır: `frontend/.env` (`REACT_APP_BACKEND_URL=http://localhost:3001`) ve `backend/.env` (`DATABASE_URL`, `CORS_ALLOWED_ORIGINS=http://localhost:3000` vb.).
+- Ortam dosyaları gitignore'dadır; şablonları repodadır: `frontend/.env.example` ve `backend/.env.example`. `./setup.sh` bunlardan gerçek `.env` dosyalarını üretir.
 - Yüklenen videolar `backend/storage/videos/` altında, veritabanı verisi `.tools/pg/data/` altında tutulur; ikisi de gitignore'dadır.
 - `backend/docker-compose.yml` Postgres + MinIO + Caddy ile konteynerli kurulum içindir (lokal geliştirmede kullanılmaz).
