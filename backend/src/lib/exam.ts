@@ -172,7 +172,11 @@ export function gradeAttempt(
   const scorable = answers.filter((a) => scorableIds.has(a.questionId));
   const correctCount = scorable.filter((a) => a.isCorrect).length;
   const scorePercent =
-    scorable.length > 0 ? (correctCount / scorable.length) * 100 : 100;
+    questions.length === 0
+      ? 0
+      : scorable.length > 0
+        ? (correctCount / scorable.length) * 100
+        : 100;
 
   return {
     answers,
@@ -180,7 +184,9 @@ export function gradeAttempt(
     wrongCount: scorable.length - correctCount,
     scorePercent,
     // Puanlanabilir soru yoksa (tümü serbest metin) sınav geçilmiş sayılır.
-    passed: scorable.length === 0 || scorePercent >= passPercent,
+    passed:
+      questions.length > 0 &&
+      (scorable.length === 0 || scorePercent >= passPercent),
   };
 }
 

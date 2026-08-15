@@ -1,7 +1,7 @@
 import axios from "axios";
 import { toast } from "sonner";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
 
 // edu_module (marti-lms) API'sine giden gerçek HTTP istemcisi.
 // Sayfalar bu istemciyi doğrudan kullanmaz; aşağıdaki `api` adapter'ı üzerinden geçer.

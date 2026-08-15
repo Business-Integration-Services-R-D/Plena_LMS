@@ -87,6 +87,7 @@ android-sdk/frontend/node_modules/.cache/default-development/2.pack
 .env.*
 *.env
 !.env.example
+!deploy/.env.production.example
 credentials.json
 *.key
 .credentials

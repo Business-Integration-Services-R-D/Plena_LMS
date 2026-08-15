@@ -1,0 +1,63 @@
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      STORAGE_DRIVER: s3
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+      CORS_ALLOWED_ORIGINS: https://${APP_DOMAIN}
+      APP_URL: https://${APP_DOMAIN}
+      SEED_ON_START: ${SEED_ON_START:-false}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - plena
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_BACKEND_URL: ""
+        REACT_APP_AUTH_BYPASS: "false"
+    restart: unless-stopped
+    networks:
+      - plena
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks:
+      - plena
+
+networks:
+  plena:
+
+volumes:
+  caddy_data:
+  caddy_config:

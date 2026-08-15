@@ -32,24 +32,34 @@ function localPath(key: string) {
 }
 
 function getS3Client() {
-  const endpointHost = env("MINIO_ENDPOINT", "localhost");
-  const port = env("MINIO_PORT", "9000");
-  const useSsl = env("MINIO_USE_SSL", "false") === "true";
+  const endpointHost = process.env.S3_ENDPOINT || process.env.MINIO_ENDPOINT;
+  const endpointPort = process.env.S3_ENDPOINT_PORT || process.env.MINIO_PORT;
+  const useSsl =
+    (process.env.S3_USE_SSL || process.env.MINIO_USE_SSL || "false") === "true";
   const protocol = useSsl ? "https" : "http";
+  const accessKeyId = process.env.S3_ACCESS_KEY_ID || process.env.MINIO_ACCESS_KEY;
+  const secretAccessKey =
+    process.env.S3_SECRET_ACCESS_KEY || process.env.MINIO_SECRET_KEY;
+
+  const endpoint = endpointHost
+    ? `${protocol}://${endpointHost}${endpointPort ? `:${endpointPort}` : ""}`
+    : undefined;
 
   return new S3Client({
-    region: "us-east-1",
-    endpoint: `${protocol}://${endpointHost}:${port}`,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: env("MINIO_ACCESS_KEY", "minioadmin"),
-      secretAccessKey: env("MINIO_SECRET_KEY", "minioadmin"),
-    },
+    region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1",
+    endpoint,
+    forcePathStyle: endpoint
+      ? (process.env.S3_FORCE_PATH_STYLE || "true") === "true"
+      : false,
+    credentials:
+      accessKeyId && secretAccessKey
+        ? { accessKeyId, secretAccessKey }
+        : undefined,
   });
 }
 
 function bucketName() {
-  return env("MINIO_BUCKET", "videos");
+  return env("S3_BUCKET", process.env.MINIO_BUCKET);
 }
 
 export function sanitizeStorageKeyPart(name: string) {
@@ -73,7 +83,12 @@ export async function ensureStorage() {
   try {
     await client.send(new HeadBucketCommand({ Bucket: bucket }));
   } catch {
-    await client.send(new CreateBucketCommand({ Bucket: bucket }));
+    const isMinio = Boolean(process.env.MINIO_ENDPOINT || process.env.S3_ENDPOINT);
+    if (process.env.S3_AUTO_CREATE_BUCKET === "true" || isMinio) {
+      await client.send(new CreateBucketCommand({ Bucket: bucket }));
+      return;
+    }
+    throw new Error(`S3 bucket erişilemiyor veya mevcut değil: ${bucket}`);
   }
 }
 
@@ -120,12 +135,15 @@ export async function uploadFileObject(
     return;
   }
 
-  const buf = Buffer.from(await file.arrayBuffer());
+  const body = Readable.fromWeb(
+    file.stream() as import("stream/web").ReadableStream,
+  );
   await getS3Client().send(
     new PutObjectCommand({
       Bucket: bucketName(),
       Key: key,
-      Body: buf,
+      Body: body,
+      ContentLength: file.size,
       ContentType: contentType,
     }),
   );
