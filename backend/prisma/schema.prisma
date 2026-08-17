@@ -49,10 +49,12 @@ enum QuestionType {
 
 /// Kontrol noktasında başarısız olunca uygulanacak politika.
 /// RETRY: video sarılmaz, soru tekrar sorulur (maxAttempts null ise sınırsız).
+/// RETRY_PREVIOUS: deneme hakkı bitince önceki kontrol noktasına sarılır.
 enum CheckpointOnFail {
   START
   PREVIOUS
   RETRY
+  RETRY_PREVIOUS
 }
 
 /// Testi geçemeyen kullanıcının tekrar denerken ne yapması gerektiği.
@@ -272,8 +274,8 @@ model Checkpoint {
   /// null = süre sınırı yok.
   timeoutSeconds Int?
   onFail         CheckpointOnFail @default(START)
-  /// Yalnızca RETRY için anlamlı: null = doğru yapana kadar sınırsız deneme.
-  /// Sayı verilirse hak bitince video başa sarılır.
+  /// RETRY politikalarında anlamlı: null = doğru yapana kadar sınırsız deneme.
+  /// Sayı verilirse hak bitince onFail politikasına göre başa veya önceki noktaya sarılır.
   maxAttempts    Int?
   createdAt      DateTime         @default(now())
 

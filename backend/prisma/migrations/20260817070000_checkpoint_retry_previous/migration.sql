@@ -1,0 +1,1 @@
+ALTER TYPE "CheckpointOnFail" ADD VALUE 'RETRY_PREVIOUS';

@@ -69,7 +69,9 @@ const COURSE_POOL_PREFIX = "[Kurs] ";
 
 const toUiOnFail = (onFail, maxAttempts) => {
   if (onFail === "PREVIOUS") return "previous";
-  if (onFail === "RETRY") return maxAttempts != null ? "retry_limited" : "retry";
+  if (onFail === "RETRY" || onFail === "RETRY_PREVIOUS") {
+    return maxAttempts != null ? "retry_limited" : "retry";
+  }
   return "start";
 };
 
@@ -80,6 +82,7 @@ const mapCheckpoint = (cp) => ({
   timeout_seconds: cp.timeoutSeconds,
   on_fail: toUiOnFail(cp.onFail, cp.maxAttempts),
   attempts: cp.maxAttempts ?? null,
+  retry_exhausted: cp.onFail === "RETRY_PREVIOUS" ? "previous" : "start",
 });
 
 const mapCourse = (c) => ({
@@ -483,7 +486,9 @@ const routes = [
               cp.on_fail === "previous"
                 ? "PREVIOUS"
                 : cp.on_fail === "retry" || cp.on_fail === "retry_limited"
-                  ? "RETRY"
+                  ? cp.on_fail === "retry_limited" && cp.retry_exhausted === "previous"
+                    ? "RETRY_PREVIOUS"
+                    : "RETRY"
                   : "START",
             // Yalnızca sınırlı denemede sayı gönderilir; diğerlerinde null.
             maxAttempts:
@@ -841,7 +846,10 @@ const routes = [
           id: cp.id,
           time: cp.timeSec,
           timeout_seconds: cp.timeoutSeconds,
-          on_fail: cp.onFail === "PREVIOUS" ? "previous" : "start",
+          on_fail:
+            cp.onFail === "PREVIOUS" || cp.onFail === "RETRY_PREVIOUS"
+              ? "previous"
+              : "start",
           question: {
             text: cp.question.prompt,
             qtype: "multiple_choice",

@@ -71,8 +71,12 @@ export async function POST(
     return NextResponse.json({ passed: true, rewindTo: null });
   }
 
-  // Başarısız + RETRY politikası: video sarılmaz, soru tekrar sorulur.
-  if (checkpoint.onFail === CheckpointOnFail.RETRY) {
+  const isRetryPolicy =
+    checkpoint.onFail === CheckpointOnFail.RETRY ||
+    checkpoint.onFail === CheckpointOnFail.RETRY_PREVIOUS;
+
+  // Başarısız + deneme politikası: haklar bitene kadar video sarılmaz.
+  if (isRetryPolicy) {
     // Deneme sayısı: son "haklar bitti" olayından bu yana yapılan hatalar.
     let failsSinceReset = 0;
     if (checkpoint.maxAttempts != null) {
@@ -117,12 +121,15 @@ export async function POST(
           : null;
       return NextResponse.json({ passed: false, retry: true, remaining, rewindTo: null });
     }
-    // Haklar bitti: aşağıdaki akışla videonun başına sarılır.
+    // Haklar bitti: aşağıdaki akış seçilen hedefe sarar.
   }
 
   // Başarısız: sarma hedefini hesapla.
   let rewindTo = 0;
-  if (checkpoint.onFail === CheckpointOnFail.PREVIOUS) {
+  if (
+    checkpoint.onFail === CheckpointOnFail.PREVIOUS ||
+    checkpoint.onFail === CheckpointOnFail.RETRY_PREVIOUS
+  ) {
     const earlier = await prisma.checkpoint.findMany({
       where: { courseId, timeSec: { lt: checkpoint.timeSec } },
       orderBy: { timeSec: "desc" },

@@ -22,7 +22,14 @@ export default function TrainingDetailPage() {
   const [previewPaused, setPreviewPaused] = useState(true);
   const [cpPanelOpen, setCpPanelOpen] = useState(false);
   const [cpAnchor, setCpAnchor] = useState(0); // panel açıldığı anda seçilen saniye
-  const [cpInline, setCpInline] = useState({ question_id: "", has_timeout: false, timeout_seconds: 60, on_fail: "start", attempts: 3 });
+  const [cpInline, setCpInline] = useState({
+    question_id: "",
+    has_timeout: false,
+    timeout_seconds: 60,
+    on_fail: "start",
+    attempts: 3,
+    retry_exhausted: "start",
+  });
   const [cpAdding, setCpAdding] = useState(false);
   // Kontrol noktası için soru kaynağı: havuzdan seç / yeni soru yaz (popup)
   const [cpSource, setCpSource] = useState("pool");
@@ -87,7 +94,14 @@ export default function TrainingDetailPage() {
   // Önizlemede seçili ana kontrol noktası ekleme paneli aç/kapat.
   const openCpPanel = () => {
     setCpAnchor(Math.floor(previewRef.current?.currentTime || 0));
-    setCpInline({ question_id: "", has_timeout: false, timeout_seconds: 60, on_fail: "start", attempts: 3 });
+    setCpInline({
+      question_id: "",
+      has_timeout: false,
+      timeout_seconds: 60,
+      on_fail: "start",
+      attempts: 3,
+      retry_exhausted: "start",
+    });
     setCpSource("pool");
     setCpPanelOpen(true);
   };
@@ -131,6 +145,7 @@ export default function TrainingDetailPage() {
           timeout_seconds: cpInline.has_timeout ? Number(cpInline.timeout_seconds) || 60 : null,
           on_fail: cpInline.on_fail,
           attempts: cpInline.on_fail === "retry_limited" ? Number(cpInline.attempts) || 3 : null,
+          retry_exhausted: cpInline.retry_exhausted,
         },
       ]);
       toast.success(`Kontrol noktası eklendi (${fmtTime(cpAnchor)})`);
@@ -330,9 +345,23 @@ export default function TrainingDetailPage() {
                     <option value="retry">Başarısızsa: Doğru yapana kadar deneyebilsin</option>
                   </select>
                   {cpInline.on_fail === "retry_limited" && (
-                    <div className="flex items-center gap-2 fade-up">
-                      <input data-testid="cp-preview-attempts-input" type="number" min="1" max="20" className={inputCls + " w-28"} value={cpInline.attempts} onChange={(e) => setCpInline({ ...cpInline, attempts: e.target.value })} />
-                      <span className="text-xs text-gray-400 whitespace-nowrap">deneme hakkı (hak bitince video başa sarılır)</span>
+                    <div className="space-y-3 fade-up">
+                      <div className="flex items-center gap-2">
+                        <input data-testid="cp-preview-attempts-input" type="number" min="1" max="20" className={inputCls + " w-28"} value={cpInline.attempts} onChange={(e) => setCpInline({ ...cpInline, attempts: e.target.value })} />
+                        <span className="text-xs text-gray-400 whitespace-nowrap">deneme hakkı</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-500 whitespace-nowrap">Haklar bitince:</span>
+                        <select
+                          data-testid="cp-preview-retry-exhausted-select"
+                          className={inputCls}
+                          value={cpInline.retry_exhausted}
+                          onChange={(e) => setCpInline({ ...cpInline, retry_exhausted: e.target.value })}
+                        >
+                          <option value="start">Video başa dönsün</option>
+                          <option value="previous">Bir önceki kontrol noktasına dönsün</option>
+                        </select>
+                      </div>
                     </div>
                   )}
                   <button data-testid="cp-preview-save-btn" className={btnPrimary + " w-full"} disabled={cpAdding || !cpInline.question_id} onClick={addCheckpointFromPreview}>
@@ -381,7 +410,7 @@ export default function TrainingDetailPage() {
                 <p className="flex-1 text-sm text-gray-600 truncate">{qById[cp.question_id]?.text || "Soru silinmiş"}</p>
                 <span className="text-xs text-gray-400 whitespace-nowrap">
                   {cp.timeout_seconds != null ? `${cp.timeout_seconds}sn` : "Süresiz"} · {
-                    { start: "Başa dön", previous: "Önceki nokta", retry: "Doğru yapana kadar", retry_limited: `${cp.attempts} deneme hakkı` }[cp.on_fail] || "Başa dön"
+                    { start: "Başa dön", previous: "Önceki nokta", retry: "Doğru yapana kadar", retry_limited: `${cp.attempts} deneme · sonra ${cp.retry_exhausted === "previous" ? "önceki nokta" : "başa dön"}` }[cp.on_fail] || "Başa dön"
                   }
                 </span>
                 <button data-testid={`delete-checkpoint-${cp.id}`} onClick={() => removeCheckpoint(cp.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
