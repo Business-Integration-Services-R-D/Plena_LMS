@@ -42,11 +42,11 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
 
   // close event on unmount
   useEffect(() => {
+    const video = videoRef.current;
     return () => {
-      const v = videoRef.current;
-      if (v && startedRef.current) {
-        onEvent("video_closed", v.currentTime);
-        onHeartbeat(v.currentTime, false);
+      if (video && startedRef.current) {
+        onEvent("video_closed", video.currentTime);
+        onHeartbeat(video.currentTime, false);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
