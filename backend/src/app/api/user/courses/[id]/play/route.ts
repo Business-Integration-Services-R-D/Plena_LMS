@@ -123,6 +123,7 @@ export async function GET(
       question: {
         id: cp.question.id,
         prompt: cp.question.prompt,
+        type: cp.question.type,
         choices: cp.question.choices,
       },
     })),

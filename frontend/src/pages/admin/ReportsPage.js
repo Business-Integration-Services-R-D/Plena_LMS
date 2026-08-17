@@ -20,6 +20,7 @@ export default function ReportsPage() {
   const [trainings, setTrainings] = useState([]);
   const [selected, setSelected] = useState("");
   const [report, setReport] = useState(null);
+  const [freeText, setFreeText] = useState([]);
   const [detail, setDetail] = useState(null);
   const [exporting, setExporting] = useState(null);
 
@@ -51,6 +52,13 @@ export default function ReportsPage() {
   useEffect(() => {
     if (selected) api.get(`/reports/trainings/${selected}`).then((r) => setReport(r.data));
     else setReport(null);
+  }, [selected]);
+
+  useEffect(() => {
+    api
+      .get("/reports/free-text", { params: selected ? { training_id: selected } : {} })
+      .then((r) => setFreeText(r.data))
+      .catch(() => setFreeText([]));
   }, [selected]);
 
   const openDetail = async (row) => {
@@ -160,6 +168,37 @@ export default function ReportsPage() {
         )}
       </div>
 
+      <div className="n-card p-8 mt-8" data-testid="free-text-answers-card">
+        <div className="mb-6">
+          <h2 className="text-lg font-medium tracking-tight text-gray-900 mb-1">Serbest Metin Cevapları</h2>
+          <p className="text-sm text-gray-400">
+            Doğru cevabı olmayan sorular; puanlamaya girmez, değerlendirmek için okunur.
+            {selected ? " Seçili eğitim için listelenir." : " Tüm eğitimler listelenir."}
+          </p>
+        </div>
+        {freeText.length === 0 ? (
+          <p className="text-sm text-gray-400">Serbest metin cevabı yok.</p>
+        ) : (
+          <div className="space-y-3 max-h-[28rem] overflow-y-auto">
+            {freeText.map((a) => (
+              <div key={`${a.source}-${a.id}`} className="px-4 py-3.5 rounded-xl bg-[#F7F7F5] border n-hairline" data-testid={`free-text-answer-${a.id}`}>
+                <div className="flex items-center gap-3 flex-wrap mb-2">
+                  <span className="text-sm font-medium text-gray-900">{a.user_name}</span>
+                  <span className="text-xs text-gray-400">{a.user_email}</span>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-black/10 text-gray-600">
+                    {a.source === "checkpoint" ? `Kontrol noktası · ${fmtTime(a.position || 0)}` : `Sınav · ${a.attempt_no}. deneme`}
+                  </span>
+                  {!selected && a.training_title && <span className="text-xs text-gray-400">{a.training_title}</span>}
+                  <span className="text-xs text-gray-400 ml-auto">{fmtDate(a.answered_at)}</span>
+                </div>
+                <p className="text-sm text-gray-700 mb-1">{a.question_text}</p>
+                <p className="text-sm text-gray-500 italic">"{a.answer_text}"</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <Dialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
         <DialogContent className="rounded-2xl max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Denetim Kaydı — {detail?.user?.name}</DialogTitle></DialogHeader>
@@ -202,10 +241,13 @@ export default function ReportsPage() {
                 <p className="text-xs uppercase tracking-wider text-gray-400 mb-3">Olay Günlüğü ({detail.events.length})</p>
                 <div className="space-y-1 max-h-64 overflow-y-auto">
                   {detail.events.map((e) => (
-                    <div key={e.event_id} className="flex items-center gap-3 px-3 py-2 text-xs border-b border-black/5 last:border-0">
-                      <span className="text-gray-400 tabular-nums whitespace-nowrap">{new Date(e.created_at).toLocaleString("tr-TR")}</span>
-                      <span className="font-medium text-gray-700">{EVENT_TR[e.type] || e.type}</span>
-                      {e.position != null && <span className="text-gray-400 ml-auto tabular-nums">{fmtTime(e.position)}</span>}
+                    <div key={e.event_id} className="px-3 py-2 text-xs border-b border-black/5 last:border-0">
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-400 tabular-nums whitespace-nowrap">{new Date(e.created_at).toLocaleString("tr-TR")}</span>
+                        <span className="font-medium text-gray-700">{EVENT_TR[e.type] || e.type}</span>
+                        {e.position != null && <span className="text-gray-400 ml-auto tabular-nums">{fmtTime(e.position)}</span>}
+                      </div>
+                      {e.answer_text && <p className="text-gray-500 italic mt-1">"{e.answer_text}"</p>}
                     </div>
                   ))}
                   {detail.events.length === 0 && <p className="text-xs text-gray-400">Olay kaydı yok.</p>}

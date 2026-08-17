@@ -53,6 +53,7 @@ const mapQuizQuestions = (courseId, quizPayload) => {
       question_id: q.id,
       text: q.prompt,
       qtype: q.type === "FREE_TEXT" ? "free_text" : "multiple_choice",
+      points: q.points ?? 1,
       options: (q.choices || []).map((c) => c.text),
     };
   });
@@ -69,7 +70,9 @@ const COURSE_POOL_PREFIX = "[Kurs] ";
 
 const toUiOnFail = (onFail, maxAttempts) => {
   if (onFail === "PREVIOUS") return "previous";
-  if (onFail === "RETRY") return maxAttempts != null ? "retry_limited" : "retry";
+  if (onFail === "RETRY" || onFail === "RETRY_PREVIOUS") {
+    return maxAttempts != null ? "retry_limited" : "retry";
+  }
   return "start";
 };
 
@@ -80,6 +83,7 @@ const mapCheckpoint = (cp) => ({
   timeout_seconds: cp.timeoutSeconds,
   on_fail: toUiOnFail(cp.onFail, cp.maxAttempts),
   attempts: cp.maxAttempts ?? null,
+  retry_exhausted: cp.onFail === "RETRY_PREVIOUS" ? "previous" : "start",
 });
 
 const mapCourse = (c) => ({
@@ -150,10 +154,19 @@ const fetchTrainingDetail = async (courseId) => {
     .map((q) => bankByPrompt.get(q.prompt))
     .filter(Boolean);
 
+  // Puanlar kurs havuzundaki kopyalarda tutulur; UI banka id'leriyle çalışır.
+  const question_points = {};
+  for (const q of coursePool?.questions || []) {
+    const bankId = bankByPrompt.get(q.prompt);
+    if (bankId) question_points[bankId] = q.points ?? 1;
+  }
+
   return {
     ...mapCourse(c),
     quiz: {
       question_ids,
+      question_points,
+      scoring_mode: c.scoringMode === "PER_QUESTION" ? "per_question" : "auto",
       pass_score: c.passPercent > 0 ? c.passPercent : null,
     },
   };
@@ -197,21 +210,36 @@ const syncQuiz = async (courseId, quiz) => {
       .map((id) => bankById.get(id))
       .filter(Boolean);
     const desiredPrompts = new Set(desired.map((q) => q.prompt));
-    const existingPrompts = new Set((coursePool.questions || []).map((q) => q.prompt));
+    const existingByPrompt = new Map(
+      (coursePool.questions || []).map((q) => [q.prompt, q]),
+    );
+    const pointsByBankId = quiz.question_points || {};
 
     for (const q of desired) {
-      if (!existingPrompts.has(q.prompt)) {
+      const points = Number(pointsByBankId[q.id]) || 1;
+      const existing = existingByPrompt.get(q.prompt);
+      if (!existing) {
         await http.post(`/admin/pools/${coursePool.id}/questions`, {
           prompt: q.prompt,
           type: q.type || "MULTIPLE_CHOICE",
+          points,
           choices: (q.choices || []).map((ch) => ({ text: ch.text, isCorrect: ch.isCorrect })),
         });
+      } else if ((existing.points ?? 1) !== points) {
+        await http.patch(`/admin/questions/${existing.id}`, { points });
       }
     }
     for (const q of coursePool.questions || []) {
       if (!desiredPrompts.has(q.prompt)) {
         await http.patch(`/admin/questions/${q.id}`, { active: false });
       }
+    }
+  }
+
+  if (quiz.scoring_mode !== undefined) {
+    const scoringMode = quiz.scoring_mode === "per_question" ? "PER_QUESTION" : "AUTO";
+    if (scoringMode !== c.scoringMode) {
+      await http.patch(`/admin/courses/${courseId}`, { scoringMode });
     }
   }
 
@@ -483,7 +511,9 @@ const routes = [
               cp.on_fail === "previous"
                 ? "PREVIOUS"
                 : cp.on_fail === "retry" || cp.on_fail === "retry_limited"
-                  ? "RETRY"
+                  ? cp.on_fail === "retry_limited" && cp.retry_exhausted === "previous"
+                    ? "RETRY_PREVIOUS"
+                    : "RETRY"
                   : "START",
             // Yalnızca sınırlı denemede sayı gönderilir; diğerlerinde null.
             maxAttempts:
@@ -698,6 +728,28 @@ const routes = [
   },
   {
     method: "GET",
+    pattern: /^\/reports\/free-text$/,
+    handler: async (_m, _b, query, config) => {
+      const courseId = config?.params?.training_id || query?.get("training_id");
+      const res = await http.get("/admin/reports/free-text", {
+        params: courseId ? { courseId } : {},
+      });
+      return res.data.rows.map((r) => ({
+        id: r.id,
+        source: r.source,
+        user_name: r.user?.name,
+        user_email: r.user?.email,
+        training_title: r.course?.title,
+        question_text: r.prompt,
+        answer_text: r.textAnswer,
+        position: r.positionSec ?? null,
+        attempt_no: r.attemptNo ?? null,
+        answered_at: r.answeredAt,
+      }));
+    },
+  },
+  {
+    method: "GET",
     pattern: /^\/reports\/assignments\/([^/]+)\/detail$/,
     handler: async (m) => {
       const res = await http.get(`/admin/enrollments/${m[1]}`);
@@ -747,6 +799,7 @@ const routes = [
             event_id: e.id,
             type: EVENT_MAP[e.eventType] || e.eventType,
             position: e.positionSec,
+            answer_text: e.metadata?.textAnswer || null,
             created_at: e.createdAt,
           })),
       };
@@ -841,10 +894,13 @@ const routes = [
           id: cp.id,
           time: cp.timeSec,
           timeout_seconds: cp.timeoutSeconds,
-          on_fail: cp.onFail === "PREVIOUS" ? "previous" : "start",
+          on_fail:
+            cp.onFail === "PREVIOUS" || cp.onFail === "RETRY_PREVIOUS"
+              ? "previous"
+              : "start",
           question: {
             text: cp.question.prompt,
-            qtype: "multiple_choice",
+            qtype: cp.question.type === "FREE_TEXT" ? "free_text" : "multiple_choice",
             options: cp.question.choices.map((c) => c.text),
           },
         };
@@ -861,6 +917,7 @@ const routes = [
       if (hasQuiz) {
         let questions = [];
         let passScore = play.course.passPercent;
+        let scoringMode = "auto";
         // Quiz soruları backend gate'i gereği ancak video tamamlandıktan
         // sonra çekilebilir (tamamlanmış eğitimde tekrar gerekmez).
         if (play.progress.completed && play.progress.status !== "COMPLETED") {
@@ -868,10 +925,16 @@ const routes = [
             const q = (await http.get(`/user/courses/${courseId}/quiz`)).data;
             questions = mapQuizQuestions(courseId, q);
             passScore = q.passPercent;
+            scoringMode = q.scoringMode === "PER_QUESTION" ? "per_question" : "auto";
           } catch {}
         }
         // Sorular video bitmeden çekilemediği için gerçek sayı ayrıca verilir.
-        quiz = { questions, pass_score: passScore, question_count: play.course.questionCount || 0 };
+        quiz = {
+          questions,
+          pass_score: passScore,
+          scoring_mode: scoringMode,
+          question_count: play.course.questionCount || 0,
+        };
       }
 
       return {
@@ -947,6 +1010,7 @@ const routes = [
         checkpointId: body.checkpoint_id,
         choiceId:
           body.answer_index != null ? choiceIds[body.answer_index] : undefined,
+        textAnswer: body.answer_text || undefined,
         timedOut: !!body.timed_out,
       });
       return {

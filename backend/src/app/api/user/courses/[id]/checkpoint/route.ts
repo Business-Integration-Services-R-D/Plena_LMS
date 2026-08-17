@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { CheckpointOnFail, Role, WatchEventType } from "@prisma/client";
+import { CheckpointOnFail, QuestionType, Role, WatchEventType } from "@prisma/client";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -10,12 +10,15 @@ export const dynamic = "force-dynamic";
 const schema = z.object({
   checkpointId: z.string().min(1),
   choiceId: z.string().optional(),
+  textAnswer: z.string().optional(),
   timedOut: z.boolean().default(false),
 });
 
 /**
  * Kontrol noktası cevabı. Doğruysa geçiş kaydedilir; yanlış/süre aşımında
  * ilerleme, politikaya göre başa veya önceki geçilen noktaya sarılır.
+ * Serbest metin sorularda doğru cevap yoktur: boş olmayan cevap geçer,
+ * metin denetim kaydında saklanır.
  */
 export async function POST(
   req: NextRequest,
@@ -51,10 +54,14 @@ export async function POST(
     return NextResponse.json({ error: "Kontrol noktası bulunamadı" }, { status: 404 });
   }
 
+  const isFreeText = checkpoint.question.type === QuestionType.FREE_TEXT;
+  const textAnswer = parsed.data.textAnswer?.trim() || null;
   const chosen = parsed.data.choiceId
     ? checkpoint.question.choices.find((c) => c.id === parsed.data.choiceId)
     : null;
-  const passed = !parsed.data.timedOut && Boolean(chosen?.isCorrect);
+  const passed =
+    !parsed.data.timedOut &&
+    (isFreeText ? Boolean(textAnswer) : Boolean(chosen?.isCorrect));
 
   if (passed) {
     await prisma.watchEvent.create({
@@ -65,14 +72,21 @@ export async function POST(
         videoId: enrollment.course.video.id,
         eventType: WatchEventType.CHECKPOINT_PASSED,
         positionSec: checkpoint.timeSec,
-        metadata: { checkpointId: checkpoint.id },
+        metadata: {
+          checkpointId: checkpoint.id,
+          ...(isFreeText ? { textAnswer } : {}),
+        },
       },
     });
     return NextResponse.json({ passed: true, rewindTo: null });
   }
 
-  // Başarısız + RETRY politikası: video sarılmaz, soru tekrar sorulur.
-  if (checkpoint.onFail === CheckpointOnFail.RETRY) {
+  const isRetryPolicy =
+    checkpoint.onFail === CheckpointOnFail.RETRY ||
+    checkpoint.onFail === CheckpointOnFail.RETRY_PREVIOUS;
+
+  // Başarısız + deneme politikası: haklar bitene kadar video sarılmaz.
+  if (isRetryPolicy) {
     // Deneme sayısı: son "haklar bitti" olayından bu yana yapılan hatalar.
     let failsSinceReset = 0;
     if (checkpoint.maxAttempts != null) {
@@ -108,6 +122,7 @@ export async function POST(
             checkpointId: checkpoint.id,
             timedOut: parsed.data.timedOut,
             retry: true,
+            ...(isFreeText ? { textAnswer } : {}),
           },
         },
       });
@@ -117,12 +132,15 @@ export async function POST(
           : null;
       return NextResponse.json({ passed: false, retry: true, remaining, rewindTo: null });
     }
-    // Haklar bitti: aşağıdaki akışla videonun başına sarılır.
+    // Haklar bitti: aşağıdaki akış seçilen hedefe sarar.
   }
 
   // Başarısız: sarma hedefini hesapla.
   let rewindTo = 0;
-  if (checkpoint.onFail === CheckpointOnFail.PREVIOUS) {
+  if (
+    checkpoint.onFail === CheckpointOnFail.PREVIOUS ||
+    checkpoint.onFail === CheckpointOnFail.RETRY_PREVIOUS
+  ) {
     const earlier = await prisma.checkpoint.findMany({
       where: { courseId, timeSec: { lt: checkpoint.timeSec } },
       orderBy: { timeSec: "desc" },
@@ -169,8 +187,9 @@ export async function POST(
         checkpointId: checkpoint.id,
         timedOut: parsed.data.timedOut,
         rewindTo,
-        // RETRY politikasında hak bittiğinde sayaç sıfırlansın diye işaretlenir.
-        ...(checkpoint.onFail === CheckpointOnFail.RETRY ? { exhausted: true } : {}),
+        ...(isFreeText ? { textAnswer } : {}),
+        // Deneme politikasında hak bittiğinde sayaç sıfırlansın diye işaretlenir.
+        ...(isRetryPolicy ? { exhausted: true } : {}),
       },
     },
   });
