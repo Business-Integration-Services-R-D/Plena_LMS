@@ -4,7 +4,7 @@ import { api, videoUrl, fmtTime } from "@/lib/api";
 import { PageHeader } from "@/components/Layout";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock, ChevronDown } from "lucide-react";
 
 const inputCls = "w-full px-4 py-2.5 rounded-xl border border-black/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent";
 
@@ -51,6 +51,17 @@ export default function TrainingDetailPage() {
   const [cpQSaving, setCpQSaving] = useState(false);
   const fileRef = useRef(null);
   const previewRef = useRef(null);
+  const passScoreRef = useRef(null);
+
+  // Hazır oran listesini açar; showPicker desteklenmeyen tarayıcıda alana odaklanır.
+  const openPassScoreOptions = () => {
+    const input = passScoreRef.current;
+    if (!input) return;
+    input.focus();
+    try {
+      input.showPicker?.();
+    } catch {}
+  };
 
   const load = useCallback(() => {
     api.get(`/trainings/${trainingId}`).then((r) => setTraining(r.data));
@@ -558,10 +569,23 @@ export default function TrainingDetailPage() {
               </label>
               {passEnabled && (
                 <div className="flex items-center gap-2">
-                  <input data-testid="quiz-pass-score-input" type="number" min="0" max="100" step="10" list="pass-score-options"
-                    className={inputCls + " w-24 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"}
-                    placeholder="%"
-                    value={training.quiz?.pass_score ?? ""} onChange={(e) => setPassScore(e.target.value)} />
+                  <div className="relative">
+                    {/* Tarayıcının datalist oku gizlenip yerine tasarımla uyumlu chevron konur. */}
+                    <input data-testid="quiz-pass-score-input" type="number" min="0" max="100" step="10" list="pass-score-options"
+                      ref={passScoreRef}
+                      className={inputCls + " w-24 pr-8 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-calendar-picker-indicator]:hidden"}
+                      placeholder="%"
+                      value={training.quiz?.pass_score ?? ""} onChange={(e) => setPassScore(e.target.value)} />
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      aria-label="Hazır oranlar"
+                      onClick={openPassScoreOptions}
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </button>
+                  </div>
                   <datalist id="pass-score-options">
                     {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((v) => <option key={v} value={v} />)}
                   </datalist>
