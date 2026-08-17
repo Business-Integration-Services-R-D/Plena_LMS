@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Mail, Trash2, Users as UsersIcon, Pencil } from "lucide-react";
 
-const inputCls = "w-full px-4 py-2.5 rounded-xl border border-black/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent";
-const btnPrimary = "px-5 py-2.5 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40";
+const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
+const btnPrimary = "px-5 py-2.5 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow] disabled:opacity-40";
 
 export default function UsersPage() {
   const [tab, setTab] = useState("users");
@@ -99,13 +99,13 @@ export default function UsersPage() {
           )
         }
       />
-      <div className="flex gap-1 bg-gray-100 rounded-full p-1 w-fit mb-8">
+      <div className="flex gap-1 bg-slate-100 rounded-full p-1 w-fit mb-8">
         {[["users", "Kullanıcılar"], ["groups", "Gruplar"]].map(([k, l]) => (
           <button
             key={k}
             data-testid={`tab-${k}`}
             onClick={() => setTab(k)}
-            className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${tab === k ? "bg-white shadow-sm text-gray-900" : "text-gray-500"}`}
+            className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${tab === k ? "bg-white shadow-sm text-navy-950" : "text-slate-500"}`}
           >
             {l}
           </button>
@@ -113,10 +113,10 @@ export default function UsersPage() {
       </div>
 
       {tab === "users" && (
-        <div className="n-card overflow-hidden">
+        <div className="n-card n-card-brand overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wider text-gray-400 border-b n-hairline bg-[#FAFAF9]">
+              <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b n-hairline bg-[#F5F8FA]">
                 <th className="px-6 py-4 font-medium">Kullanıcı</th>
                 <th className="px-6 py-4 font-medium">Rol</th>
                 <th className="px-6 py-4 font-medium">Durum</th>
@@ -126,13 +126,13 @@ export default function UsersPage() {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.user_id} className="border-b border-black/5 last:border-0 hover:bg-gray-50/50" data-testid={`user-row-${u.email}`}>
+                <tr key={u.user_id} className="border-b border-navy-900/5 last:border-0 hover:bg-slate-50/60" data-testid={`user-row-${u.email}`}>
                   <td className="px-6 py-4">
-                    <p className="font-medium text-gray-900">{u.name}</p>
-                    <p className="text-gray-400 text-xs">{u.email}</p>
+                    <p className="font-medium text-navy-950">{u.name}</p>
+                    <p className="text-slate-400 text-xs">{u.email}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${u.role === "admin" ? "bg-black text-white" : "bg-gray-100 text-gray-600"}`}>
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${u.role === "admin" ? "bg-gradient-to-r from-navy-900 to-navy-700 text-white" : "bg-slate-100 text-slate-600"}`}>
                       {u.role === "admin" ? "Yönetici" : "Çalışan"}
                     </span>
                   </td>
@@ -141,17 +141,17 @@ export default function UsersPage() {
                       {u.status === "active" ? "Aktif" : "Davet Edildi"}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-gray-400">{fmtDate(u.created_at)}</td>
+                  <td className="px-6 py-4 text-slate-400">{fmtDate(u.created_at)}</td>
                   <td className="px-6 py-4">
                     <div className="flex justify-end gap-1">
                       {u.status !== "active" && (
                         <button data-testid={`resend-activation-${u.email}`} onClick={() => resend(u)} title="Aktivasyonu tekrar gönder"
-                          className="p-2 rounded-lg text-gray-400 hover:text-[#007AFF] hover:bg-blue-50 transition-colors">
+                          className="p-2 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors">
                           <Mail className="w-4 h-4" />
                         </button>
                       )}
                       <button data-testid={`delete-user-${u.email}`} onClick={() => deleteUser(u)} title="Sil"
-                        className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -165,26 +165,26 @@ export default function UsersPage() {
 
       {tab === "groups" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {groups.length === 0 && <p className="text-sm text-gray-400 col-span-full">Henüz grup yok.</p>}
+          {groups.length === 0 && <p className="text-sm text-slate-400 col-span-full">Henüz grup yok.</p>}
           {groups.map((g) => (
             <div key={g.group_id} className="n-card n-card-hover p-6" data-testid={`group-card-${g.name}`}>
               <div className="flex items-start justify-between mb-4">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-navy-50 text-navy-700 flex items-center justify-center">
                   <UsersIcon className="w-5 h-5" />
                 </div>
                 <div className="flex gap-1">
                   <button data-testid={`edit-group-${g.name}`} onClick={() => { setGroupForm({ name: g.name, member_ids: g.member_ids || [] }); setGroupModal(g); }}
-                    className="p-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors">
+                    className="p-2 rounded-lg text-slate-400 hover:text-navy-950 hover:bg-slate-100 transition-colors">
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button data-testid={`delete-group-${g.name}`} onClick={() => deleteGroup(g)}
-                    className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                    className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
-              <p className="font-medium text-gray-900">{g.name}</p>
-              <p className="text-sm text-gray-400 mt-1">{(g.member_ids || []).length} üye</p>
+              <p className="font-medium text-navy-950">{g.name}</p>
+              <p className="text-sm text-slate-400 mt-1">{(g.member_ids || []).length} üye</p>
             </div>
           ))}
         </div>
@@ -213,12 +213,12 @@ export default function UsersPage() {
           <DialogHeader><DialogTitle>{groupModal?.group_id ? "Grubu Düzenle" : "Yeni Grup"}</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <input data-testid="group-name-input" className={inputCls} placeholder="Grup adı" value={groupForm.name} onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })} />
-            <div className="max-h-56 overflow-y-auto border border-black/5 rounded-xl divide-y divide-black/5">
+            <div className="max-h-56 overflow-y-auto border border-navy-900/5 rounded-xl divide-y divide-navy-900/5">
               {users.filter((u) => u.role === "employee").map((u) => (
-                <label key={u.user_id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50">
-                  <input type="checkbox" data-testid={`group-member-${u.email}`} checked={groupForm.member_ids.includes(u.user_id)} onChange={() => toggleMember(u.user_id)} className="accent-black" />
-                  <span className="text-sm text-gray-800">{u.name}</span>
-                  <span className="text-xs text-gray-400 ml-auto">{u.email}</span>
+                <label key={u.user_id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50">
+                  <input type="checkbox" data-testid={`group-member-${u.email}`} checked={groupForm.member_ids.includes(u.user_id)} onChange={() => toggleMember(u.user_id)} className="accent-navy-900" />
+                  <span className="text-sm text-slate-700">{u.name}</span>
+                  <span className="text-xs text-slate-400 ml-auto">{u.email}</span>
                 </label>
               ))}
             </div>

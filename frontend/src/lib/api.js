@@ -1149,8 +1149,8 @@ export const STATUS_TR = {
 };
 
 export const STATUS_COLOR = {
-  assigned: "bg-gray-100 text-gray-600",
-  in_progress: "bg-blue-50 text-blue-600",
+  assigned: "bg-slate-100 text-slate-600",
+  in_progress: "bg-brand-50 text-brand-700",
   video_completed: "bg-amber-50 text-amber-600",
   completed: "bg-emerald-50 text-emerald-600",
 };

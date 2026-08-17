@@ -5,7 +5,7 @@ import VideoPlayer from "@/components/VideoPlayer";
 import { toast } from "sonner";
 import { ArrowLeft, CheckCircle2, PartyPopper } from "lucide-react";
 
-const btnPrimary = "px-8 py-3 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40";
+const btnPrimary = "px-8 py-3 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow] disabled:opacity-40";
 
 // Sınav cevapları gönderilene kadar tarayıcıda tutulur; sayfa yenilenirse kaybolmaz.
 const draftKey = (assignmentId) => `plena.quiz-draft.${assignmentId}`;
@@ -116,7 +116,7 @@ export default function WatchPage() {
     }
   };
 
-  if (!data) return <div className="w-6 h-6 border-2 border-gray-300 border-t-black rounded-full animate-spin" />;
+  if (!data) return <div className="w-6 h-6 border-2 border-slate-200 border-t-navy-900 rounded-full animate-spin" />;
 
   const { training } = data;
   const quiz = training.quiz;
@@ -126,12 +126,12 @@ export default function WatchPage() {
 
   return (
     <div className="fade-up max-w-4xl" data-testid="watch-page">
-      <Link to="/trainings" data-testid="back-to-my-trainings" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors">
+      <Link to="/trainings" data-testid="back-to-my-trainings" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-navy-950 mb-6 transition-colors">
         <ArrowLeft className="w-4 h-4" /> Eğitimlerim
       </Link>
-      <p className="text-xs uppercase tracking-[0.2em] font-medium text-gray-400 mb-2">Eğitim</p>
-      <h1 className="text-3xl font-semibold tracking-tight text-gray-900 mb-2">{training.title}</h1>
-      {training.description && <p className="text-base text-gray-500 mb-8 max-w-2xl">{training.description}</p>}
+      <p className="text-xs uppercase tracking-[0.2em] font-medium text-brand-600 mb-2">Eğitim</p>
+      <h1 className="text-3xl font-semibold tracking-tight text-navy-950 mb-2">{training.title}</h1>
+      {training.description && <p className="text-base text-slate-500 mb-8 max-w-2xl">{training.description}</p>}
 
       {stage === "video" && (
         <div>
@@ -146,14 +146,14 @@ export default function WatchPage() {
             onEnded={onEnded}
           />
           <div className="mt-6 n-card p-6 flex items-center gap-6 flex-wrap">
-            <p className="text-sm text-gray-500">
-              <span className="font-medium text-gray-900">{training.checkpoints.length}</span> kontrol noktası
+            <p className="text-sm text-slate-500">
+              <span className="font-medium text-navy-950">{training.checkpoints.length}</span> kontrol noktası
             </p>
-            <p className="text-sm text-gray-500">
-              Süre: <span className="font-medium text-gray-900">{fmtTime(training.duration)}</span>
+            <p className="text-sm text-slate-500">
+              Süre: <span className="font-medium text-navy-950">{fmtTime(training.duration)}</span>
             </p>
-            {quiz && <p className="text-sm text-gray-500">Video sonunda <span className="font-medium text-gray-900">{quiz.question_count ?? quiz.questions.length} soruluk sınav</span> var</p>}
-            <p className="text-xs text-gray-400 ml-auto">İleri sarma kapalıdır · İzlemeniz kayıt altına alınır</p>
+            {quiz && <p className="text-sm text-slate-500">Video sonunda <span className="font-medium text-navy-950">{quiz.question_count ?? quiz.questions.length} soruluk sınav</span> var</p>}
+            <p className="text-xs text-slate-400 ml-auto">İleri sarma kapalıdır · İzlemeniz kayıt altına alınır</p>
           </div>
         </div>
       )}
@@ -162,20 +162,20 @@ export default function WatchPage() {
         <div className="space-y-5" data-testid="quiz-view">
           <div className="n-card p-6 flex items-center gap-3 flex-wrap">
             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-            <p className="text-sm text-gray-700">Video tamamlandı. Sınavı bitirerek eğitimi tamamlayın.{quiz.pass_score ? ` Geçme notu: %${quiz.pass_score}` : ""}</p>
-            <p className="text-xs text-gray-400 ml-auto">Cevaplarınız bu tarayıcıda saklanır; sayfayı yenilerseniz kaybolmaz</p>
+            <p className="text-sm text-slate-700">Video tamamlandı. Sınavı bitirerek eğitimi tamamlayın.{quiz.pass_score ? ` Geçme notu: %${quiz.pass_score}` : ""}</p>
+            <p className="text-xs text-slate-400 ml-auto">Cevaplarınız bu tarayıcıda saklanır; sayfayı yenilerseniz kaybolmaz</p>
           </div>
           {quiz.questions.map((q, i) => (
             <div key={q.question_id} className="n-card p-8" data-testid={`quiz-question-${i}`}>
               <div className="flex items-center justify-between gap-3 mb-3">
-                <p className="text-xs uppercase tracking-[0.2em] font-medium text-gray-400">Soru {i + 1} / {quiz.questions.length}</p>
+                <p className="text-xs uppercase tracking-[0.2em] font-medium text-slate-400">Soru {i + 1} / {quiz.questions.length}</p>
                 {quiz.scoring_mode === "per_question" && (
-                  <span className="text-xs font-medium text-gray-500 bg-[#F5F5F7] px-2.5 py-1 rounded-full" data-testid={`quiz-q${i}-points`}>
+                  <span className="text-xs font-medium text-slate-500 bg-[#F5F8FA] px-2.5 py-1 rounded-full" data-testid={`quiz-q${i}-points`}>
                     {q.points} puan
                   </span>
                 )}
               </div>
-              <p className="text-lg font-medium tracking-tight text-gray-900 mb-5">{q.text}</p>
+              <p className="text-lg font-medium tracking-tight text-navy-950 mb-5">{q.text}</p>
               {q.qtype === "multiple_choice" ? (
                 <div className="space-y-2">
                   {q.options.map((o, j) => (
@@ -183,7 +183,7 @@ export default function WatchPage() {
                       key={j}
                       data-testid={`quiz-q${i}-option-${j}`}
                       onClick={() => setQuizAnswers({ ...quizAnswers, [q.question_id]: { index: j } })}
-                      className={`w-full text-left px-4 py-3 rounded-xl border text-sm transition-colors ${quizAnswers[q.question_id]?.index === j ? "border-[#007AFF] bg-blue-50/60 text-gray-900" : "border-black/10 text-gray-700 hover:bg-gray-50"}`}
+                      className={`w-full text-left px-4 py-3 rounded-xl border text-sm transition-colors ${quizAnswers[q.question_id]?.index === j ? "border-brand-500 bg-brand-50/60 text-navy-950" : "border-navy-900/10 text-slate-700 hover:bg-slate-50"}`}
                     >
                       {o}
                     </button>
@@ -192,7 +192,7 @@ export default function WatchPage() {
               ) : (
                 <textarea
                   data-testid={`quiz-q${i}-text-input`}
-                  className="w-full px-4 py-3 rounded-xl border border-black/10 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent"
+                  className="w-full px-4 py-3 rounded-xl border border-navy-900/10 text-sm min-h-[100px] focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                   placeholder="Cevabınızı yazın..."
                   value={quizAnswers[q.question_id]?.text || ""}
                   onChange={(e) => setQuizAnswers({ ...quizAnswers, [q.question_id]: { text: e.target.value } })}
@@ -211,8 +211,8 @@ export default function WatchPage() {
           <div className={`w-16 h-16 rounded-2xl mx-auto mb-5 flex items-center justify-center ${result.passed ? "bg-emerald-50" : "bg-red-50"}`}>
             {result.passed ? <PartyPopper className="w-7 h-7 text-emerald-500" /> : <span className="text-2xl">↺</span>}
           </div>
-          <p className="text-4xl font-semibold tracking-tight text-gray-900 mb-2" data-testid="quiz-score">%{result.score}</p>
-          <p className="text-sm text-gray-500 mb-8">
+          <p className="text-4xl font-semibold tracking-tight text-navy-950 mb-2" data-testid="quiz-score">%{result.score}</p>
+          <p className="text-sm text-slate-500 mb-8">
             {result.passed
               ? "Tebrikler! Eğitimi başarıyla tamamladınız."
               : `Geçme notunun (%${result.pass_score}) altında kaldınız. Sınavı tekrar deneyebilirsiniz.`}
@@ -232,8 +232,8 @@ export default function WatchPage() {
           <div className="w-16 h-16 rounded-2xl bg-emerald-50 mx-auto mb-5 flex items-center justify-center">
             <CheckCircle2 className="w-7 h-7 text-emerald-500" />
           </div>
-          <p className="text-xl font-semibold tracking-tight text-gray-900 mb-2">Bu eğitimi tamamladınız</p>
-          <p className="text-sm text-gray-500 mb-8">İzleme ve sınav kayıtlarınız denetim için saklandı.</p>
+          <p className="text-xl font-semibold tracking-tight text-navy-950 mb-2">Bu eğitimi tamamladınız</p>
+          <p className="text-sm text-slate-500 mb-8">İzleme ve sınav kayıtlarınız denetim için saklandı.</p>
           <Link to="/trainings" data-testid="done-back-btn" className={btnPrimary + " inline-block"}>Eğitimlerime Dön</Link>
         </div>
       )}

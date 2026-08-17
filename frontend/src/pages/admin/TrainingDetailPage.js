@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock, ChevronDown } from "lucide-react";
 
-const inputCls = "w-full px-4 py-2.5 rounded-xl border border-black/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent";
+const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
 
 // Sınavın toplam puanı; soru puanlarının toplamı bunu geçemez.
 const MAX_TOTAL_POINTS = 100;
@@ -17,7 +17,7 @@ const clampPoints = (value) => {
   if (!Number.isFinite(n) || n < 1) return 1;
   return Math.min(n, MAX_TOTAL_POINTS);
 };
-const btnPrimary = "px-5 py-2.5 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40";
+const btnPrimary = "px-5 py-2.5 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow] disabled:opacity-40";
 
 export default function TrainingDetailPage() {
   const { trainingId } = useParams();
@@ -250,7 +250,7 @@ export default function TrainingDetailPage() {
     }
   };
 
-  if (!training) return <div className="w-6 h-6 border-2 border-gray-300 border-t-black rounded-full animate-spin" />;
+  if (!training) return <div className="w-6 h-6 border-2 border-slate-200 border-t-navy-900 rounded-full animate-spin" />;
 
   const qById = Object.fromEntries(questions.map((q) => [q.question_id, q]));
   const cpSelectedIsFreeText = qById[cpInline.question_id]?.qtype === "free_text";
@@ -271,7 +271,7 @@ export default function TrainingDetailPage() {
 
   return (
     <div className="fade-up" data-testid="training-detail-page">
-      <Link to="/admin/trainings" data-testid="back-to-trainings" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 mb-6 transition-colors">
+      <Link to="/admin/trainings" data-testid="back-to-trainings" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-navy-950 mb-6 transition-colors">
         <ArrowLeft className="w-4 h-4" /> Eğitimlere Dön
       </Link>
       <PageHeader overline="Eğitim Düzenleyici" title={training.title} subtitle={training.description} />
@@ -279,7 +279,7 @@ export default function TrainingDetailPage() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {/* VIDEO */}
         <div className="n-card p-8">
-          <h2 className="text-lg font-medium tracking-tight text-gray-900 mb-6">Eğitim Videosu</h2>
+          <h2 className="text-lg font-medium tracking-tight text-navy-950 mb-6">Eğitim Videosu</h2>
           {training.video_filename ? (
             <div>
               <video
@@ -295,8 +295,8 @@ export default function TrainingDetailPage() {
 
               {/* Kontrol noktası şeridi: sarı işaretlere tıklayınca o ana gider */}
               {(training.checkpoints || []).length > 0 && training.duration > 0 && (
-                <div className="relative h-2 mt-3 rounded-full bg-gray-100" data-testid="cp-preview-strip">
-                  <div className="absolute inset-y-0 left-0 rounded-full bg-[#007AFF]/30" style={{ width: `${Math.min(100, (previewTime / training.duration) * 100)}%` }} />
+                <div className="relative h-2 mt-3 rounded-full bg-slate-100" data-testid="cp-preview-strip">
+                  <div className="absolute inset-y-0 left-0 rounded-full bg-brand-500/30" style={{ width: `${Math.min(100, (previewTime / training.duration) * 100)}%` }} />
                   {(training.checkpoints || []).map((cp) => (
                     <button
                       key={cp.id}
@@ -317,15 +317,15 @@ export default function TrainingDetailPage() {
               )}
 
               <div className="flex items-center justify-between mt-4">
-                <p className="text-sm text-gray-400">Süre: {fmtTime(training.duration)} · {(training.video_size / 1024 / 1024).toFixed(1)} MB</p>
-                <button data-testid="replace-video-btn" onClick={() => fileRef.current?.click()} className="text-sm text-[#007AFF] font-medium hover:underline">Videoyu değiştir</button>
+                <p className="text-sm text-slate-400">Süre: {fmtTime(training.duration)} · {(training.video_size / 1024 / 1024).toFixed(1)} MB</p>
+                <button data-testid="replace-video-btn" onClick={() => fileRef.current?.click()} className="text-sm text-brand-600 font-medium hover:underline">Videoyu değiştir</button>
               </div>
 
               {/* Duraklatılan ana kontrol noktası ekleme */}
               {previewPaused && !cpPanelOpen && (
-                <div className="flex items-center justify-between mt-3 px-4 py-3 rounded-xl bg-[#F7F7F5] border n-hairline fade-up">
-                  <span className="flex items-center gap-1.5 text-sm text-gray-600 tabular-nums">
-                    <Clock className="w-3.5 h-3.5 text-[#007AFF]" /> Seçilen an: <span className="font-medium text-gray-900">{fmtTime(Math.floor(previewTime))}</span>
+                <div className="flex items-center justify-between mt-3 px-4 py-3 rounded-xl bg-[#F5F8FA] border n-hairline fade-up">
+                  <span className="flex items-center gap-1.5 text-sm text-slate-600 tabular-nums">
+                    <Clock className="w-3.5 h-3.5 text-brand-600" /> Seçilen an: <span className="font-medium text-navy-950">{fmtTime(Math.floor(previewTime))}</span>
                   </span>
                   <button data-testid="cp-preview-add-btn" className={btnPrimary + " !px-4 !py-2"} onClick={openCpPanel}>
                     <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> Kontrol Noktası Ekle</span>
@@ -334,31 +334,31 @@ export default function TrainingDetailPage() {
               )}
 
               {cpPanelOpen && (
-                <div className="mt-3 p-5 rounded-xl bg-[#F7F7F5] border n-hairline space-y-3 fade-up" data-testid="cp-preview-panel">
+                <div className="mt-3 p-5 rounded-xl bg-[#F5F8FA] border n-hairline space-y-3 fade-up" data-testid="cp-preview-panel">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-gray-900 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-[#007AFF]" /> {fmtTime(cpAnchor)} noktasına kontrol noktası
+                    <p className="text-sm font-medium text-navy-950 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-brand-600" /> {fmtTime(cpAnchor)} noktasına kontrol noktası
                     </p>
-                    <button data-testid="cp-preview-cancel-btn" onClick={() => setCpPanelOpen(false)} className="text-sm text-gray-400 hover:text-gray-700 transition-colors">Vazgeç</button>
+                    <button data-testid="cp-preview-cancel-btn" onClick={() => setCpPanelOpen(false)} className="text-sm text-slate-400 hover:text-slate-700 transition-colors">Vazgeç</button>
                   </div>
                   <div className="flex items-center gap-5">
-                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
                       <input
                         data-testid="cp-source-new"
                         type="radio"
                         name="cp-question-source"
-                        className="accent-black"
+                        className="accent-navy-900"
                         checked={cpSource === "new"}
                         onChange={() => { setCpSource("new"); setCpQForm({ text: "", qtype: "multiple_choice", options: ["", ""], correct_index: 0 }); setCpQModal(true); }}
                       />
                       Yeni bir soru yazmak istiyorum
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
                       <input
                         data-testid="cp-source-pool"
                         type="radio"
                         name="cp-question-source"
-                        className="accent-black"
+                        className="accent-navy-900"
                         checked={cpSource === "pool"}
                         onChange={() => setCpSource("pool")}
                       />
@@ -385,8 +385,8 @@ export default function TrainingDetailPage() {
                         {(qById[cpInline.question_id].options || []).map((o, i) => {
                           const correct = i === qById[cpInline.question_id].correct_index;
                           return (
-                            <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${correct ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-black/5 bg-white text-gray-600"}`}>
-                              <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${correct ? "text-emerald-500" : "text-gray-200"}`} />
+                            <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${correct ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-navy-900/5 bg-white text-slate-600"}`}>
+                              <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${correct ? "text-emerald-500" : "text-slate-200"}`} />
                               {o}
                             </div>
                           );
@@ -395,23 +395,23 @@ export default function TrainingDetailPage() {
                     )
                   )}
                   <div className="flex items-center gap-5">
-                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
                       <input
                         data-testid="cp-preview-no-timeout"
                         type="radio"
                         name="cp-timeout-mode"
-                        className="accent-black"
+                        className="accent-navy-900"
                         checked={!cpInline.has_timeout}
                         onChange={() => setCpInline({ ...cpInline, has_timeout: false })}
                       />
                       Süre sınırı yok
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
                       <input
                         data-testid="cp-preview-has-timeout"
                         type="radio"
                         name="cp-timeout-mode"
-                        className="accent-black"
+                        className="accent-navy-900"
                         checked={cpInline.has_timeout}
                         onChange={() => setCpInline({ ...cpInline, has_timeout: true })}
                       />
@@ -421,7 +421,7 @@ export default function TrainingDetailPage() {
                   {cpInline.has_timeout && (
                     <div className="flex items-center gap-2 fade-up">
                       <input data-testid="cp-preview-timeout-input" type="number" min="5" max="600" className={inputCls + " w-28"} value={cpInline.timeout_seconds} onChange={(e) => setCpInline({ ...cpInline, timeout_seconds: e.target.value })} />
-                      <span className="text-xs text-gray-400 whitespace-nowrap">saniye içinde cevaplanmalı</span>
+                      <span className="text-xs text-slate-400 whitespace-nowrap">saniye içinde cevaplanmalı</span>
                     </div>
                   )}
                   {/* Serbest metinde yanlış cevap yoktur; yalnızca süre aşımı başarısızlık sayılır. */}
@@ -432,7 +432,7 @@ export default function TrainingDetailPage() {
                         <option value="previous">Süre dolarsa: Önceki nokta</option>
                       </select>
                     ) : (
-                      <p className="px-3 py-2 rounded-lg text-xs text-gray-500 bg-white border border-black/10">
+                      <p className="px-3 py-2 rounded-lg text-xs text-slate-500 bg-white border border-navy-900/10">
                         Süre sınırı olmadığı için başarısızlık durumu yoktur; kullanıcı cevabını yazana kadar video devam etmez.
                       </p>
                     )
@@ -448,10 +448,10 @@ export default function TrainingDetailPage() {
                     <div className="space-y-3 fade-up">
                       <div className="flex items-center gap-2">
                         <input data-testid="cp-preview-attempts-input" type="number" min="1" max="20" className={inputCls + " w-28"} value={cpInline.attempts} onChange={(e) => setCpInline({ ...cpInline, attempts: e.target.value })} />
-                        <span className="text-xs text-gray-400 whitespace-nowrap">deneme hakkı</span>
+                        <span className="text-xs text-slate-400 whitespace-nowrap">deneme hakkı</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500 whitespace-nowrap">Haklar bitince:</span>
+                        <span className="text-xs text-slate-500 whitespace-nowrap">Haklar bitince:</span>
                         <select
                           data-testid="cp-preview-retry-exhausted-select"
                           className={inputCls}
@@ -478,21 +478,21 @@ export default function TrainingDetailPage() {
             <button
               data-testid="video-upload-area"
               onClick={() => fileRef.current?.click()}
-              className="w-full border-2 border-dashed border-gray-200 rounded-2xl py-16 flex flex-col items-center gap-3 hover:border-[#007AFF] hover:bg-blue-50/30 transition-colors"
+              className="w-full border-2 border-dashed border-slate-200 rounded-2xl py-16 flex flex-col items-center gap-3 hover:border-brand-500 hover:bg-brand-50/30 transition-colors"
             >
-              <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
-                <UploadCloud className="w-6 h-6 text-gray-400" />
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
+                <UploadCloud className="w-6 h-6 text-slate-400" />
               </div>
-              <p className="text-sm font-medium text-gray-700">MP4 video yükleyin</p>
-              <p className="text-xs text-gray-400">Maksimum 250MB</p>
+              <p className="text-sm font-medium text-slate-700">MP4 video yükleyin</p>
+              <p className="text-xs text-slate-400">Maksimum 250MB</p>
             </button>
           )}
           {uploading > 0 && (
             <div className="mt-4">
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-[#007AFF] rounded-full transition-[width]" style={{ width: `${uploading}%` }} />
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-brand-500 rounded-full transition-[width]" style={{ width: `${uploading}%` }} />
               </div>
-              <p className="text-xs text-gray-400 mt-2">Yükleniyor... %{uploading}</p>
+              <p className="text-xs text-slate-400 mt-2">Yükleniyor... %{uploading}</p>
             </div>
           )}
           <input ref={fileRef} type="file" accept="video/mp4" className="hidden" data-testid="video-file-input" onChange={(e) => uploadVideo(e.target.files?.[0])} />
@@ -500,24 +500,24 @@ export default function TrainingDetailPage() {
 
         {/* CHECKPOINTS */}
         <div className="n-card p-8">
-          <h2 className="text-lg font-medium tracking-tight text-gray-900 mb-1">Kontrol Noktaları</h2>
-          <p className="text-sm text-gray-400 mb-6">Video belirtilen sürede durur ve soru sorar.</p>
+          <h2 className="text-lg font-medium tracking-tight text-navy-950 mb-1">Kontrol Noktaları</h2>
+          <p className="text-sm text-slate-400 mb-6">Video belirtilen sürede durur ve soru sorar.</p>
           <div className="space-y-3 mb-6">
-            {(training.checkpoints || []).length === 0 && <p className="text-sm text-gray-400">Henüz kontrol noktası yok.</p>}
+            {(training.checkpoints || []).length === 0 && <p className="text-sm text-slate-400">Henüz kontrol noktası yok.</p>}
             {(training.checkpoints || []).map((cp) => (
-              <div key={cp.id} className="flex items-center gap-4 px-4 py-3 rounded-xl bg-[#F7F7F5] border n-hairline" data-testid={`checkpoint-item-${cp.id}`}>
-                <span className="flex items-center gap-1.5 text-sm font-medium text-gray-900 tabular-nums"><Clock className="w-3.5 h-3.5 text-[#007AFF]" />{fmtTime(cp.time)}</span>
-                <p className="flex-1 text-sm text-gray-600 truncate">{qById[cp.question_id]?.text || "Soru silinmiş"}</p>
-                <span className="text-xs text-gray-400 whitespace-nowrap">
+              <div key={cp.id} className="flex items-center gap-4 px-4 py-3 rounded-xl bg-[#F5F8FA] border n-hairline" data-testid={`checkpoint-item-${cp.id}`}>
+                <span className="flex items-center gap-1.5 text-sm font-medium text-navy-950 tabular-nums"><Clock className="w-3.5 h-3.5 text-brand-600" />{fmtTime(cp.time)}</span>
+                <p className="flex-1 text-sm text-slate-600 truncate">{qById[cp.question_id]?.text || "Soru silinmiş"}</p>
+                <span className="text-xs text-slate-400 whitespace-nowrap">
                   {cp.timeout_seconds != null ? `${cp.timeout_seconds}sn` : "Süresiz"} · {
                     { start: "Başa dön", previous: "Önceki nokta", retry: "Doğru yapana kadar", retry_limited: `${cp.attempts} deneme · sonra ${cp.retry_exhausted === "previous" ? "önceki nokta" : "başa dön"}` }[cp.on_fail] || "Başa dön"
                   }
                 </span>
-                <button data-testid={`delete-checkpoint-${cp.id}`} onClick={() => removeCheckpoint(cp.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                <button data-testid={`delete-checkpoint-${cp.id}`} onClick={() => removeCheckpoint(cp.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"><Trash2 className="w-4 h-4" /></button>
               </div>
             ))}
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-slate-400">
             Yeni kontrol noktası eklemek için soldaki önizlemede videoyu istediğiniz anda duraklatıp "Kontrol Noktası Ekle" butonunu kullanın.
           </p>
         </div>
@@ -526,8 +526,8 @@ export default function TrainingDetailPage() {
         <div className="n-card p-8 xl:col-span-2">
           <div className="flex items-end justify-between flex-wrap gap-4 mb-6">
             <div>
-              <h2 className="text-lg font-medium tracking-tight text-gray-900 mb-1">Eğitim Sonu Sınavı</h2>
-              <p className="text-sm text-gray-400">
+              <h2 className="text-lg font-medium tracking-tight text-navy-950 mb-1">Eğitim Sonu Sınavı</h2>
+              <p className="text-sm text-slate-400">
                 Soru havuzundan sınava soru seçin. {selectedIds.length} soru seçildi
                 {scoringMode === "per_question" && selectedIds.length > 0 && (
                   <span className={pointsOverLimit ? "text-red-500 font-medium" : ""} data-testid="quiz-total-points">
@@ -539,7 +539,7 @@ export default function TrainingDetailPage() {
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500 whitespace-nowrap">Puanlama:</span>
+                <span className="text-sm text-slate-500 whitespace-nowrap">Puanlama:</span>
                 <select
                   data-testid="quiz-scoring-mode-select"
                   className={inputCls + " w-auto pr-9"}
@@ -550,11 +550,11 @@ export default function TrainingDetailPage() {
                   <option value="per_question">Soru başına puan</option>
                 </select>
               </div>
-              <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer select-none">
+              <label className="flex items-center gap-2 text-sm text-slate-500 cursor-pointer select-none">
                 <input
                   data-testid="quiz-pass-score-toggle"
                   type="checkbox"
-                  className="accent-black"
+                  className="accent-navy-900"
                   checked={passEnabled}
                   onChange={(e) => {
                     if (e.target.checked) {
@@ -581,7 +581,7 @@ export default function TrainingDetailPage() {
                       tabIndex={-1}
                       aria-label="Hazır oranlar"
                       onClick={openPassScoreOptions}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
+                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 transition-colors"
                     >
                       <ChevronDown className="w-4 h-4" />
                     </button>
@@ -589,13 +589,13 @@ export default function TrainingDetailPage() {
                   <datalist id="pass-score-options">
                     {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((v) => <option key={v} value={v} />)}
                   </datalist>
-                  <span className="text-sm text-gray-400">%</span>
+                  <span className="text-sm text-slate-400">%</span>
                 </div>
               )}
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {questions.length === 0 && <p className="text-sm text-gray-400">Soru havuzu boş. Önce <Link to="/admin/questions" className="text-[#007AFF] hover:underline">soru ekleyin</Link>.</p>}
+            {questions.length === 0 && <p className="text-sm text-slate-400">Soru havuzu boş. Önce <Link to="/admin/questions" className="text-brand-600 hover:underline">soru ekleyin</Link>.</p>}
             {questions.map((q) => {
               const selected = selectedIds.includes(q.question_id);
               // Bu soruya verilebilecek en yüksek puan = 100 - diğer soruların toplamı.
@@ -604,17 +604,17 @@ export default function TrainingDetailPage() {
               return (
                 <div
                   key={q.question_id}
-                  className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-colors ${selected ? "border-[#007AFF] bg-blue-50/50" : "border-black/5 bg-[#F7F7F5] hover:bg-[#F1F1EF]"}`}
+                  className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-colors ${selected ? "border-brand-500 bg-brand-50/50" : "border-navy-900/5 bg-[#F5F8FA] hover:bg-slate-100"}`}
                 >
                   <button
                     data-testid={`quiz-question-toggle-${q.question_id}`}
                     onClick={() => toggleQuizQuestion(q.question_id)}
                     className="flex items-center gap-3 flex-1 min-w-0 text-left"
                   >
-                    <CheckCircle2 className={`w-4 h-4 shrink-0 ${selected ? "text-[#007AFF]" : "text-gray-300"}`} />
-                    <span className="text-sm text-gray-800 flex-1">{q.text}</span>
+                    <CheckCircle2 className={`w-4 h-4 shrink-0 ${selected ? "text-brand-600" : "text-slate-300"}`} />
+                    <span className="text-sm text-slate-800 flex-1">{q.text}</span>
                   </button>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">{q.qtype === "multiple_choice" ? "Seçmeli" : "Metin"}</span>
+                  <span className="text-xs text-slate-400 whitespace-nowrap">{q.qtype === "multiple_choice" ? "Seçmeli" : "Metin"}</span>
                   {scoringMode === "per_question" && selected && (
                     <div className="flex items-center gap-1.5 shrink-0">
                       <input
@@ -624,12 +624,12 @@ export default function TrainingDetailPage() {
                         max={maxAllowed}
                         aria-label="Soru puanı"
                         title={`En fazla ${maxAllowed} puan`}
-                        className={`w-16 px-2 py-1.5 rounded-lg border bg-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent ${ownPoints > maxAllowed ? "border-red-400" : "border-black/10"}`}
+                        className={`w-16 px-2 py-1.5 rounded-lg border bg-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent ${ownPoints > maxAllowed ? "border-red-400" : "border-navy-900/10"}`}
                         value={questionPoints[q.question_id] ?? 1}
                         onChange={(e) => setQuestionPoint(q.question_id, e.target.value, maxAllowed)}
                         onBlur={(e) => setQuestionPoint(q.question_id, clampPoints(e.target.value), maxAllowed)}
                       />
-                      <span className="text-xs text-gray-400">puan</span>
+                      <span className="text-xs text-slate-400">puan</span>
                     </div>
                   )}
                 </div>
@@ -638,7 +638,7 @@ export default function TrainingDetailPage() {
           </div>
           {questions.length > 0 && (
             <div className="flex items-center justify-between gap-4 flex-wrap mt-6">
-              <p className={`text-xs ${pointsOverLimit ? "text-red-500" : "text-gray-400"}`}>
+              <p className={`text-xs ${pointsOverLimit ? "text-red-500" : "text-slate-400"}`}>
                 {pointsOverLimit
                   ? `Soru puanlarının toplamı ${totalPoints}. Kaydetmek için toplamı ${MAX_TOTAL_POINTS} veya altına indirin.`
                   : scoringMode === "per_question"
@@ -678,17 +678,17 @@ export default function TrainingDetailPage() {
             </select>
             {cpQForm.qtype === "multiple_choice" ? (
               <div className="space-y-2">
-                <p className="text-xs text-gray-400">Seçenekler — doğru cevabı işaretleyin</p>
+                <p className="text-xs text-slate-400">Seçenekler — doğru cevabı işaretleyin</p>
                 {cpQForm.options.map((o, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <input type="radio" data-testid={`cp-correct-option-${i}`} name="cp-q-correct" checked={cpQForm.correct_index === i} onChange={() => setCpQForm({ ...cpQForm, correct_index: i })} className="accent-emerald-600" />
                     <input data-testid={`cp-option-input-${i}`} className={inputCls} placeholder={`Seçenek ${i + 1}`} value={o} onChange={(e) => setCpQOption(i, e.target.value)} />
                     {cpQForm.options.length > 2 && (
-                      <button onClick={() => setCpQForm({ ...cpQForm, options: cpQForm.options.filter((_, j) => j !== i), correct_index: 0 })} className="p-2 text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => setCpQForm({ ...cpQForm, options: cpQForm.options.filter((_, j) => j !== i), correct_index: 0 })} className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                     )}
                   </div>
                 ))}
-                <button data-testid="cp-add-option-btn" onClick={() => setCpQForm({ ...cpQForm, options: [...cpQForm.options, ""] })} className="text-sm text-[#007AFF] font-medium hover:underline">+ Seçenek ekle</button>
+                <button data-testid="cp-add-option-btn" onClick={() => setCpQForm({ ...cpQForm, options: [...cpQForm.options, ""] })} className="text-sm text-brand-600 font-medium hover:underline">+ Seçenek ekle</button>
               </div>
             ) : (
               <p className="px-3 py-2 rounded-lg text-xs text-amber-700 bg-amber-50 border border-amber-200">

@@ -229,7 +229,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
   return (
     <div
       ref={playerRef}
-      className={`relative overflow-hidden bg-black shadow-[0_20px_60px_rgb(0,0,0,0.15)] ${isFullscreen ? "h-screen flex items-center rounded-none" : "rounded-2xl"}`}
+      className={`relative overflow-hidden bg-black shadow-[0_20px_60px_rgba(14,32,51,0.18)] ${isFullscreen ? "h-screen flex items-center rounded-none" : "rounded-2xl"}`}
       data-testid="video-player"
     >
       <video
@@ -252,7 +252,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
       <div className="absolute bottom-0 inset-x-0 bg-black/50 backdrop-blur-xl px-5 py-4">
         <div className="relative h-2 rounded-full bg-white/20 cursor-pointer mb-3 group" onClick={handleBarClick} data-testid="video-progress-bar">
           <div className="absolute inset-y-0 left-0 rounded-full bg-white/35" style={{ width: `${dur ? Math.min(100, (maxPos / dur) * 100) : 0}%` }} />
-          <div className="absolute inset-y-0 left-0 rounded-full bg-[#007AFF]" style={{ width: `${dur ? Math.min(100, (current / dur) * 100) : 0}%` }} />
+          <div className="absolute inset-y-0 left-0 rounded-full bg-brand-400" style={{ width: `${dur ? Math.min(100, (current / dur) * 100) : 0}%` }} />
           {checkpoints.map((cp) => (
             <div
               key={cp.id}
@@ -306,17 +306,17 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
 
       {/* checkpoint modal */}
       {activeCp && !activeCp.failed && q && (
-        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6 z-10" data-testid="checkpoint-modal">
+        <div className="absolute inset-0 bg-navy-950/75 backdrop-blur-sm flex items-center justify-center p-6 z-10" data-testid="checkpoint-modal">
           <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-5">
-              <p className="text-xs uppercase tracking-[0.2em] font-medium text-gray-400">Kontrol Noktası</p>
+              <p className="text-xs uppercase tracking-[0.2em] font-medium text-brand-600">Kontrol Noktası</p>
               {countdown != null && (
-                <span className={`text-sm font-semibold tabular-nums px-3 py-1 rounded-full ${countdown <= 10 ? "bg-red-50 text-red-500" : "bg-gray-100 text-gray-600"}`} data-testid="checkpoint-countdown">
+                <span className={`text-sm font-semibold tabular-nums px-3 py-1 rounded-full ${countdown <= 10 ? "bg-red-50 text-red-500" : "bg-slate-100 text-slate-600"}`} data-testid="checkpoint-countdown">
                   {countdown}s
                 </span>
               )}
             </div>
-            <p className="text-lg font-medium tracking-tight text-gray-900 mb-6">{q.text}</p>
+            <p className="text-lg font-medium tracking-tight text-navy-950 mb-6">{q.text}</p>
             {retryMsg && (
               <p className="text-sm font-medium text-red-500 -mt-3 mb-5" data-testid="checkpoint-retry-msg">{retryMsg}</p>
             )}
@@ -327,7 +327,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
                     key={i}
                     data-testid={`checkpoint-option-${i}`}
                     onClick={() => setAnswer({ ...answer, index: i })}
-                    className={`w-full text-left px-4 py-3 rounded-xl border text-sm transition-colors ${answer.index === i ? "border-[#007AFF] bg-blue-50/60 text-gray-900" : "border-black/10 text-gray-700 hover:bg-gray-50"}`}
+                    className={`w-full text-left px-4 py-3 rounded-xl border text-sm transition-colors ${answer.index === i ? "border-brand-500 bg-brand-50/60 text-navy-950" : "border-navy-900/10 text-slate-700 hover:bg-slate-50"}`}
                   >
                     {o}
                   </button>
@@ -336,7 +336,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
             ) : (
               <textarea
                 data-testid="checkpoint-text-input"
-                className="w-full px-4 py-3 rounded-xl border border-black/10 text-sm min-h-[90px] mb-6 focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent"
+                className="w-full px-4 py-3 rounded-xl border border-navy-900/10 text-sm min-h-[90px] mb-6 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
                 placeholder="Cevabınızı yazın..."
                 value={answer.text}
                 onChange={(e) => setAnswer({ ...answer, text: e.target.value })}
@@ -346,7 +346,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
               data-testid="checkpoint-submit-btn"
               disabled={submitting || (q.qtype === "multiple_choice" ? answer.index === null : !answer.text.trim())}
               onClick={() => submitCheckpoint(false)}
-              className="w-full py-3 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40"
+              className="w-full py-3 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40"
             >
               Cevapla ve Devam Et
             </button>
@@ -356,16 +356,16 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
 
       {/* checkpoint fail */}
       {activeCp?.failed && (
-        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-6 z-10" data-testid="checkpoint-fail-modal">
+        <div className="absolute inset-0 bg-navy-950/75 backdrop-blur-sm flex items-center justify-center p-6 z-10" data-testid="checkpoint-fail-modal">
           <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl text-center">
-            <p className="text-lg font-medium tracking-tight text-gray-900 mb-2">
+            <p className="text-lg font-medium tracking-tight text-navy-950 mb-2">
               {activeCp.timedOut ? "Süre doldu" : "Yanlış cevap"}
             </p>
-            <p className="text-sm text-gray-500 mb-6">
+            <p className="text-sm text-slate-500 mb-6">
               Video {activeCp.rewind_to === 0 ? "başa alındı" : `${fmtTime(activeCp.rewind_to)} noktasına geri alındı`}. Bu bölümü tekrar izlemeniz gerekiyor.
             </p>
             <button data-testid="checkpoint-fail-continue-btn" onClick={dismissFail}
-              className="px-8 py-3 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-[background-color,transform]">
+              className="px-8 py-3 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 active:scale-[0.98] transition-[background-color,transform]">
               Tekrar İzle
             </button>
           </div>

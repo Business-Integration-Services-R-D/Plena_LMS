@@ -3,7 +3,7 @@
 }
 
 ::selection {
-  background: rgba(0, 122, 255, 0.15);
+  background: rgba(31, 118, 162, 0.16);
 }
 
 ::-webkit-scrollbar {
@@ -14,22 +14,23 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.12);
+  background: rgba(14, 32, 51, 0.14);
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.22);
+  background: rgba(14, 32, 51, 0.26);
 }
 
-/* Notion-like layered card */
+/* Precise, cool-toned surface card — the base building block for the
+   authenticated "Modern Maritime Operations" experience. */
 .n-card {
   background: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 16px;
+  border: 1px solid rgba(15, 42, 67, 0.08);
+  border-radius: 14px;
   box-shadow:
-    0 1px 1px rgba(0, 0, 0, 0.02),
-    0 2px 4px rgba(0, 0, 0, 0.02),
-    0 12px 32px -16px rgba(0, 0, 0, 0.1);
+    0 1px 1px rgba(14, 32, 51, 0.02),
+    0 2px 4px rgba(14, 32, 51, 0.03),
+    0 12px 28px -16px rgba(14, 32, 51, 0.12);
 }
 
 .n-card-hover {
@@ -40,15 +41,48 @@
 }
 .n-card-hover:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 0, 0, 0.1);
+  border-color: rgba(15, 42, 67, 0.14);
   box-shadow:
-    0 1px 1px rgba(0, 0, 0, 0.02),
-    0 4px 8px rgba(0, 0, 0, 0.04),
-    0 20px 44px -18px rgba(0, 0, 0, 0.18);
+    0 1px 1px rgba(14, 32, 51, 0.02),
+    0 4px 10px rgba(14, 32, 51, 0.05),
+    0 20px 40px -18px rgba(14, 32, 51, 0.16);
 }
 
 .n-hairline {
-  border-color: rgba(0, 0, 0, 0.06);
+  border-color: rgba(15, 42, 67, 0.08);
+}
+
+/* Branded card variant — a slim gradient course-line across the top edge.
+   Reserved for a small number of "hero" surfaces (primary stat, highlighted
+   card) so the accent stays intentional rather than applied everywhere. */
+.n-card-brand {
+  position: relative;
+  overflow: hidden;
+}
+.n-card-brand::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #0aa5c4 0%, #175d80 55%, #0e2033 100%);
+}
+
+/* Cyan glow used sparingly on hover for primary interactive surfaces. */
+.n-card-glow-hover {
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+.n-card-glow-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(10, 165, 196, 0.35);
+  box-shadow:
+    0 0 0 1px rgba(10, 165, 196, 0.12),
+    0 4px 10px rgba(14, 32, 51, 0.05),
+    0 22px 44px -18px rgba(10, 165, 196, 0.28);
 }
 
 @keyframes fadeUp {

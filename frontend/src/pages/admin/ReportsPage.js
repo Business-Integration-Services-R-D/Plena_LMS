@@ -6,7 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recha
 import { Eye, FileDown, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 
-const inputCls = "px-4 py-2.5 rounded-xl border border-black/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent";
+const inputCls = "px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
 
 const EVENT_TR = {
   video_started: "Video başlatıldı", video_paused: "Video duraklatıldı", video_resumed: "Video devam ettirildi",
@@ -72,15 +72,15 @@ export default function ReportsPage() {
 
       {overview && overview.per_training.length > 0 && (
         <div className="n-card p-8 mb-8">
-          <h2 className="text-lg font-medium tracking-tight text-gray-900 mb-6">Atama / Tamamlanma Dağılımı</h2>
+          <h2 className="text-lg font-medium tracking-tight text-navy-950 mb-6">Atama / Tamamlanma Dağılımı</h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={overview.per_training} barGap={4}>
-                <XAxis dataKey="title" tick={{ fontSize: 12, fill: "#86868B" }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#86868B" }} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: "rgba(0,0,0,0.03)" }} contentStyle={{ borderRadius: 12, border: "1px solid rgba(0,0,0,0.06)" }} />
-                <Bar dataKey="assigned" name="Atanan" fill="#E5E5EA" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="completed" name="Tamamlanan" fill="#007AFF" radius={[6, 6, 0, 0]} />
+                <XAxis dataKey="title" tick={{ fontSize: 12, fill: "#7A8B9A" }} axisLine={false} tickLine={false} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#7A8B9A" }} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: "rgba(14,32,51,0.03)" }} contentStyle={{ borderRadius: 12, border: "1px solid rgba(15,42,67,0.08)" }} />
+                <Bar dataKey="assigned" name="Atanan" fill="#DCE4EC" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="completed" name="Tamamlanan" fill="#1F76A2" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -89,7 +89,7 @@ export default function ReportsPage() {
 
       <div className="n-card p-8">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
-          <h2 className="text-lg font-medium tracking-tight text-gray-900">Eğitim Detay Raporu</h2>
+          <h2 className="text-lg font-medium tracking-tight text-navy-950">Eğitim Detay Raporu</h2>
           <div className="flex items-center gap-2 flex-wrap">
             <select data-testid="report-training-select" className={inputCls} value={selected} onChange={(e) => setSelected(e.target.value)}>
               <option value="">Eğitim seçin...</option>
@@ -101,7 +101,7 @@ export default function ReportsPage() {
                   data-testid="export-pdf-btn"
                   disabled={!!exporting}
                   onClick={() => exportReport("pdf")}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow] disabled:opacity-40"
                 >
                   <FileDown className="w-4 h-4" /> {exporting === "pdf" ? "Hazırlanıyor..." : "PDF"}
                 </button>
@@ -109,7 +109,7 @@ export default function ReportsPage() {
                   data-testid="export-excel-btn"
                   disabled={!!exporting}
                   onClick={() => exportReport("excel")}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-black/10 text-gray-900 text-sm font-medium hover:bg-gray-50 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40"
+                  className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-white border border-navy-900/10 text-navy-950 text-sm font-medium hover:bg-slate-50 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40"
                 >
                   <FileSpreadsheet className="w-4 h-4" /> {exporting === "excel" ? "Hazırlanıyor..." : "Excel"}
                 </button>
@@ -117,12 +117,12 @@ export default function ReportsPage() {
             )}
           </div>
         </div>
-        {!report && <p className="text-sm text-gray-400">Rapor görüntülemek için bir eğitim seçin.</p>}
+        {!report && <p className="text-sm text-slate-400">Rapor görüntülemek için bir eğitim seçin.</p>}
         {report && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-gray-400 border-b n-hairline bg-[#FAFAF9]">
+                <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b n-hairline bg-[#F5F8FA]">
                   <th className="px-4 py-3 font-medium">Kullanıcı</th>
                   <th className="px-4 py-3 font-medium">Durum</th>
                   <th className="px-4 py-3 font-medium">İzleme</th>
@@ -136,27 +136,27 @@ export default function ReportsPage() {
               </thead>
               <tbody>
                 {report.rows.map((r) => (
-                  <tr key={r.assignment_id} className="border-b border-black/5 last:border-0 hover:bg-gray-50/50" data-testid={`report-row-${r.user_email}`}>
+                  <tr key={r.assignment_id} className="border-b border-navy-900/5 last:border-0 hover:bg-slate-50/60" data-testid={`report-row-${r.user_email}`}>
                     <td className="px-4 py-3.5">
-                      <p className="font-medium text-gray-900">{r.user_name}</p>
-                      <p className="text-xs text-gray-400">{r.user_email}</p>
+                      <p className="font-medium text-navy-950">{r.user_name}</p>
+                      <p className="text-xs text-slate-400">{r.user_email}</p>
                     </td>
                     <td className="px-4 py-3.5"><span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLOR[r.status]}`}>{STATUS_TR[r.status]}</span></td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-[#007AFF] rounded-full" style={{ width: `${r.watch_pct}%` }} />
+                        <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-brand-500 rounded-full" style={{ width: `${r.watch_pct}%` }} />
                         </div>
-                        <span className="text-xs text-gray-500 tabular-nums">%{r.watch_pct}</span>
+                        <span className="text-xs text-slate-500 tabular-nums">%{r.watch_pct}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-gray-500 tabular-nums">{fmtTime(r.watched_seconds)}</td>
-                    <td className="px-4 py-3.5 text-gray-500">{r.checkpoints_passed}/{r.checkpoints_total}</td>
-                    <td className="px-4 py-3.5">{r.checkpoint_fails > 0 ? <span className="text-red-500 font-medium">{r.checkpoint_fails}</span> : <span className="text-gray-300">0</span>}</td>
-                    <td className="px-4 py-3.5">{r.quiz_score != null ? <span className="font-medium text-gray-900">%{r.quiz_score}</span> : <span className="text-gray-300">-</span>}</td>
-                    <td className="px-4 py-3.5 text-gray-400">{fmtDate(r.completed_at)}</td>
+                    <td className="px-4 py-3.5 text-slate-500 tabular-nums">{fmtTime(r.watched_seconds)}</td>
+                    <td className="px-4 py-3.5 text-slate-500">{r.checkpoints_passed}/{r.checkpoints_total}</td>
+                    <td className="px-4 py-3.5">{r.checkpoint_fails > 0 ? <span className="text-red-500 font-medium">{r.checkpoint_fails}</span> : <span className="text-slate-300">0</span>}</td>
+                    <td className="px-4 py-3.5">{r.quiz_score != null ? <span className="font-medium text-navy-950">%{r.quiz_score}</span> : <span className="text-slate-300">-</span>}</td>
+                    <td className="px-4 py-3.5 text-slate-400">{fmtDate(r.completed_at)}</td>
                     <td className="px-4 py-3.5">
-                      <button data-testid={`report-detail-${r.user_email}`} onClick={() => openDetail(r)} className="p-2 rounded-lg text-gray-400 hover:text-[#007AFF] hover:bg-blue-50 transition-colors">
+                      <button data-testid={`report-detail-${r.user_email}`} onClick={() => openDetail(r)} className="p-2 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors">
                         <Eye className="w-4 h-4" />
                       </button>
                     </td>
@@ -170,29 +170,29 @@ export default function ReportsPage() {
 
       <div className="n-card p-8 mt-8" data-testid="free-text-answers-card">
         <div className="mb-6">
-          <h2 className="text-lg font-medium tracking-tight text-gray-900 mb-1">Serbest Metin Cevapları</h2>
-          <p className="text-sm text-gray-400">
+          <h2 className="text-lg font-medium tracking-tight text-navy-950 mb-1">Serbest Metin Cevapları</h2>
+          <p className="text-sm text-slate-400">
             Doğru cevabı olmayan sorular; puanlamaya girmez, değerlendirmek için okunur.
             {selected ? " Seçili eğitim için listelenir." : " Tüm eğitimler listelenir."}
           </p>
         </div>
         {freeText.length === 0 ? (
-          <p className="text-sm text-gray-400">Serbest metin cevabı yok.</p>
+          <p className="text-sm text-slate-400">Serbest metin cevabı yok.</p>
         ) : (
           <div className="space-y-3 max-h-[28rem] overflow-y-auto">
             {freeText.map((a) => (
-              <div key={`${a.source}-${a.id}`} className="px-4 py-3.5 rounded-xl bg-[#F7F7F5] border n-hairline" data-testid={`free-text-answer-${a.id}`}>
+              <div key={`${a.source}-${a.id}`} className="px-4 py-3.5 rounded-xl bg-[#F5F8FA] border n-hairline" data-testid={`free-text-answer-${a.id}`}>
                 <div className="flex items-center gap-3 flex-wrap mb-2">
-                  <span className="text-sm font-medium text-gray-900">{a.user_name}</span>
-                  <span className="text-xs text-gray-400">{a.user_email}</span>
-                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-black/10 text-gray-600">
+                  <span className="text-sm font-medium text-navy-950">{a.user_name}</span>
+                  <span className="text-xs text-slate-400">{a.user_email}</span>
+                  <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-navy-900/10 text-slate-600">
                     {a.source === "checkpoint" ? `Kontrol noktası · ${fmtTime(a.position || 0)}` : `Sınav · ${a.attempt_no}. deneme`}
                   </span>
-                  {!selected && a.training_title && <span className="text-xs text-gray-400">{a.training_title}</span>}
-                  <span className="text-xs text-gray-400 ml-auto">{fmtDate(a.answered_at)}</span>
+                  {!selected && a.training_title && <span className="text-xs text-slate-400">{a.training_title}</span>}
+                  <span className="text-xs text-slate-400 ml-auto">{fmtDate(a.answered_at)}</span>
                 </div>
-                <p className="text-sm text-gray-700 mb-1">{a.question_text}</p>
-                <p className="text-sm text-gray-500 italic">"{a.answer_text}"</p>
+                <p className="text-sm text-slate-700 mb-1">{a.question_text}</p>
+                <p className="text-sm text-slate-500 italic">"{a.answer_text}"</p>
               </div>
             ))}
           </div>
@@ -205,32 +205,32 @@ export default function ReportsPage() {
           {detail && (
             <div className="space-y-6 mt-2">
               <div className="grid grid-cols-3 gap-3 text-sm">
-                <div className="bg-[#F7F7F5] border n-hairline rounded-xl p-4">
-                  <p className="text-xs text-gray-400 mb-1">İzleme Süresi</p>
-                  <p className="font-medium text-gray-900">{fmtTime(detail.progress?.watched_seconds || 0)}</p>
+                <div className="bg-[#F5F8FA] border n-hairline rounded-xl p-4">
+                  <p className="text-xs text-slate-400 mb-1">İzleme Süresi</p>
+                  <p className="font-medium text-navy-950">{fmtTime(detail.progress?.watched_seconds || 0)}</p>
                 </div>
-                <div className="bg-[#F7F7F5] border n-hairline rounded-xl p-4">
-                  <p className="text-xs text-gray-400 mb-1">Video Tamam</p>
-                  <p className="font-medium text-gray-900">{detail.progress?.video_completed ? "Evet" : "Hayır"}</p>
+                <div className="bg-[#F5F8FA] border n-hairline rounded-xl p-4">
+                  <p className="text-xs text-slate-400 mb-1">Video Tamam</p>
+                  <p className="font-medium text-navy-950">{detail.progress?.video_completed ? "Evet" : "Hayır"}</p>
                 </div>
-                <div className="bg-[#F7F7F5] border n-hairline rounded-xl p-4">
-                  <p className="text-xs text-gray-400 mb-1">Sınav Denemesi</p>
-                  <p className="font-medium text-gray-900">{(detail.progress?.quiz_attempts || []).length}</p>
+                <div className="bg-[#F5F8FA] border n-hairline rounded-xl p-4">
+                  <p className="text-xs text-slate-400 mb-1">Sınav Denemesi</p>
+                  <p className="font-medium text-navy-950">{(detail.progress?.quiz_attempts || []).length}</p>
                 </div>
               </div>
               {(detail.progress?.quiz_attempts || []).length > 0 && (
                 <div>
-                  <p className="text-xs uppercase tracking-wider text-gray-400 mb-3">Son Sınav Cevapları</p>
+                  <p className="text-xs uppercase tracking-wider text-slate-400 mb-3">Son Sınav Cevapları</p>
                   <div className="space-y-2">
                     {detail.progress.quiz_attempts[detail.progress.quiz_attempts.length - 1].answers.map((a, i) => (
-                      <div key={i} className="px-4 py-3 rounded-xl bg-[#F5F5F7] text-sm">
-                        <p className="text-gray-800 mb-1">{a.text}</p>
+                      <div key={i} className="px-4 py-3 rounded-xl bg-[#F5F8FA] text-sm">
+                        <p className="text-slate-800 mb-1">{a.text}</p>
                         {a.qtype === "multiple_choice" ? (
                           <p className={a.correct ? "text-emerald-600" : "text-red-500"}>
                             Cevap: {a.options?.[a.answer_index] ?? "-"} {a.correct ? "✓" : `✗ (Doğru: ${a.options?.[a.correct_index]})`}
                           </p>
                         ) : (
-                          <p className="text-gray-500 italic">"{a.answer_text || "-"}" <span className="text-amber-500 not-italic">(manuel değerlendirme)</span></p>
+                          <p className="text-slate-500 italic">"{a.answer_text || "-"}" <span className="text-amber-500 not-italic">(manuel değerlendirme)</span></p>
                         )}
                       </div>
                     ))}
@@ -238,19 +238,19 @@ export default function ReportsPage() {
                 </div>
               )}
               <div>
-                <p className="text-xs uppercase tracking-wider text-gray-400 mb-3">Olay Günlüğü ({detail.events.length})</p>
+                <p className="text-xs uppercase tracking-wider text-slate-400 mb-3">Olay Günlüğü ({detail.events.length})</p>
                 <div className="space-y-1 max-h-64 overflow-y-auto">
                   {detail.events.map((e) => (
-                    <div key={e.event_id} className="px-3 py-2 text-xs border-b border-black/5 last:border-0">
+                    <div key={e.event_id} className="px-3 py-2 text-xs border-b border-navy-900/5 last:border-0">
                       <div className="flex items-center gap-3">
-                        <span className="text-gray-400 tabular-nums whitespace-nowrap">{new Date(e.created_at).toLocaleString("tr-TR")}</span>
-                        <span className="font-medium text-gray-700">{EVENT_TR[e.type] || e.type}</span>
-                        {e.position != null && <span className="text-gray-400 ml-auto tabular-nums">{fmtTime(e.position)}</span>}
+                        <span className="text-slate-400 tabular-nums whitespace-nowrap">{new Date(e.created_at).toLocaleString("tr-TR")}</span>
+                        <span className="font-medium text-slate-700">{EVENT_TR[e.type] || e.type}</span>
+                        {e.position != null && <span className="text-slate-400 ml-auto tabular-nums">{fmtTime(e.position)}</span>}
                       </div>
-                      {e.answer_text && <p className="text-gray-500 italic mt-1">"{e.answer_text}"</p>}
+                      {e.answer_text && <p className="text-slate-500 italic mt-1">"{e.answer_text}"</p>}
                     </div>
                   ))}
-                  {detail.events.length === 0 && <p className="text-xs text-gray-400">Olay kaydı yok.</p>}
+                  {detail.events.length === 0 && <p className="text-xs text-slate-400">Olay kaydı yok.</p>}
                 </div>
               </div>
             </div>
