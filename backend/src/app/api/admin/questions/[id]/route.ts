@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 const schema = z.object({
   active: z.boolean().optional(),
   prompt: z.string().min(3).optional(),
+  points: z.number().int().min(1).max(100).optional(),
 });
 
 /**

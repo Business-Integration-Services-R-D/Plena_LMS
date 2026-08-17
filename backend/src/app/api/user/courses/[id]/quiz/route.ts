@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { EnrollmentStatus, Role } from "@prisma/client";
+import { EnrollmentStatus, Role, ScoringMode } from "@prisma/client";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -77,10 +77,13 @@ export async function GET(
     maxAttempts: settings.maxAttempts,
     durationMinutes: settings.durationMinutes,
     retakePolicy: settings.retakePolicy,
+    scoringMode: settings.scoringMode,
     questions: questions.map((q) => ({
       id: q.id,
       prompt: q.prompt,
       type: q.type,
+      // AUTO modunda her soru eşit ağırlıkta olduğu için puan gösterilmez.
+      points: settings.scoringMode === ScoringMode.PER_QUESTION ? q.points : 1,
       choices: q.choices.map((c) => ({ id: c.id, text: c.text })),
     })),
   });
@@ -120,7 +123,12 @@ export async function POST(
     return NextResponse.json({ error: "Soru bulunamadı" }, { status: 409 });
   }
 
-  const graded = gradeAttempt(questions, parsed.data.answers, settings.passPercent);
+  const graded = gradeAttempt(
+    questions,
+    parsed.data.answers,
+    settings.passPercent,
+    settings.scoringMode,
+  );
   const attemptNo = enrollment.attemptCount + 1;
   const now = new Date();
 

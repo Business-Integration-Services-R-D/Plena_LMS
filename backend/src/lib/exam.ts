@@ -1,4 +1,4 @@
-import { RetakePolicy } from "@prisma/client";
+import { RetakePolicy, ScoringMode } from "@prisma/client";
 import { checkWindow, type EnrollmentWindow } from "./window";
 
 /**
@@ -17,6 +17,7 @@ export type ExamSettings = {
   maxAttempts: number;
   durationMinutes: number | null;
   retakePolicy: RetakePolicy;
+  scoringMode: ScoringMode;
 };
 
 type CourseFallback = {
@@ -29,6 +30,7 @@ type CourseFallback = {
 type ExamRow = CourseFallback & {
   durationMinutes: number | null;
   retakePolicy: RetakePolicy;
+  scoringMode: ScoringMode;
 };
 
 /** Exam varsa onu, yoksa Course üzerindeki eski ayarları döner. */
@@ -44,6 +46,7 @@ export function resolveExamSettings(
       maxAttempts: exam.maxAttempts,
       durationMinutes: exam.durationMinutes,
       retakePolicy: exam.retakePolicy,
+      scoringMode: exam.scoringMode,
     };
   }
 
@@ -54,6 +57,7 @@ export function resolveExamSettings(
     maxAttempts: course.maxAttempts,
     durationMinutes: null,
     retakePolicy: RetakePolicy.TEST_ONLY,
+    scoringMode: ScoringMode.AUTO,
   };
 }
 
@@ -130,28 +134,44 @@ export type GradedAttempt = {
   passed: boolean;
 };
 
+export type GradableQuestion = {
+  id: string;
+  type?: "MULTIPLE_CHOICE" | "FREE_TEXT";
+  /** PER_QUESTION modunda ağırlık; verilmezse 1 sayılır. */
+  points?: number;
+  choices: Array<{ id: string; isCorrect: boolean }>;
+};
+
+/** Sorunun skora katkısı. AUTO modunda her soru eşit ağırlık taşır. */
+function questionWeight(
+  question: GradableQuestion,
+  scoringMode: ScoringMode,
+): number {
+  if (scoringMode === ScoringMode.AUTO) return 1;
+  const points = question.points ?? 1;
+  return points > 0 ? points : 0;
+}
+
 /**
  * Cevapları puanlar. Cevaplanmamış veya doğru şıkkı tanımsız soru yanlış sayılır.
- * Serbest metin (FREE_TEXT) soruların doğru cevabı yoktur; cevap kaydedilir
- * ama puanlamaya dahil edilmez.
+ * Serbest metin (FREE_TEXT) soruların doğru cevabı yoktur; boş olmayan cevap
+ * sorunun tam puanını kazanır.
  */
 export function gradeAttempt(
-  questions: Array<{
-    id: string;
-    type?: "MULTIPLE_CHOICE" | "FREE_TEXT";
-    choices: Array<{ id: string; isCorrect: boolean }>;
-  }>,
+  questions: GradableQuestion[],
   submitted: Array<{ questionId: string; choiceId?: string | null; textAnswer?: string | null }>,
   passPercent: number,
+  scoringMode: ScoringMode = ScoringMode.AUTO,
 ): GradedAttempt {
   const answers: GradedAnswer[] = questions.map((question) => {
     const given = submitted.find((a) => a.questionId === question.id);
     if (question.type === "FREE_TEXT") {
+      const textAnswer = given?.textAnswer?.trim() || null;
       return {
         questionId: question.id,
         choiceId: null,
-        textAnswer: given?.textAnswer?.trim() || null,
-        isCorrect: false,
+        textAnswer,
+        isCorrect: Boolean(textAnswer),
       };
     }
     const correctChoice = question.choices.find((c) => c.isCorrect);
@@ -165,28 +185,26 @@ export function gradeAttempt(
     };
   });
 
-  // Puanlama yalnızca çoktan seçmeli sorular üzerinden yapılır.
-  const scorableIds = new Set(
-    questions.filter((q) => q.type !== "FREE_TEXT").map((q) => q.id),
+  const correctIds = new Set(
+    answers.filter((a) => a.isCorrect).map((a) => a.questionId),
   );
-  const scorable = answers.filter((a) => scorableIds.has(a.questionId));
-  const correctCount = scorable.filter((a) => a.isCorrect).length;
-  const scorePercent =
-    questions.length === 0
-      ? 0
-      : scorable.length > 0
-        ? (correctCount / scorable.length) * 100
-        : 100;
+  let totalWeight = 0;
+  let earnedWeight = 0;
+  for (const question of questions) {
+    const weight = questionWeight(question, scoringMode);
+    totalWeight += weight;
+    if (correctIds.has(question.id)) earnedWeight += weight;
+  }
+
+  const correctCount = correctIds.size;
+  const scorePercent = totalWeight > 0 ? (earnedWeight / totalWeight) * 100 : 0;
 
   return {
     answers,
     correctCount,
-    wrongCount: scorable.length - correctCount,
+    wrongCount: questions.length - correctCount,
     scorePercent,
-    // Puanlanabilir soru yoksa (tümü serbest metin) sınav geçilmiş sayılır.
-    passed:
-      questions.length > 0 &&
-      (scorable.length === 0 || scorePercent >= passPercent),
+    passed: totalWeight > 0 && scorePercent >= passPercent,
   };
 }
 

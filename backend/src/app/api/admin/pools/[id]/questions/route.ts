@@ -9,6 +9,8 @@ export const dynamic = "force-dynamic";
 const schema = z.object({
   prompt: z.string().min(3),
   type: z.nativeEnum(QuestionType).default(QuestionType.MULTIPLE_CHOICE),
+  /// Yalnızca PER_QUESTION puanlamasında kullanılır.
+  points: z.number().int().min(1).max(100).default(1),
   choices: z
     .array(z.object({ text: z.string().min(1), isCorrect: z.boolean() }))
     .default([]),
@@ -56,6 +58,7 @@ export async function POST(
       poolId,
       prompt: parsed.data.prompt.trim(),
       type: parsed.data.type,
+      points: parsed.data.points,
       sortOrder,
       ...(parsed.data.type === QuestionType.MULTIPLE_CHOICE
         ? {

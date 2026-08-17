@@ -49,10 +49,20 @@ enum QuestionType {
 
 /// Kontrol noktasında başarısız olunca uygulanacak politika.
 /// RETRY: video sarılmaz, soru tekrar sorulur (maxAttempts null ise sınırsız).
+/// RETRY_PREVIOUS: deneme hakkı bitince önceki kontrol noktasına sarılır.
 enum CheckpointOnFail {
   START
   PREVIOUS
   RETRY
+  RETRY_PREVIOUS
+}
+
+/// Sınav puanlamasının nasıl yapılacağı.
+/// AUTO: her soru eşit ağırlıkta (soru puanları yok sayılır).
+/// PER_QUESTION: her soru kendi puanı kadar ağırlık taşır.
+enum ScoringMode {
+  AUTO
+  PER_QUESTION
 }
 
 /// Testi geçemeyen kullanıcının tekrar denerken ne yapması gerektiği.
@@ -157,6 +167,8 @@ model Question {
   poolId    String
   prompt    String
   type      QuestionType @default(MULTIPLE_CHOICE)
+  /// Sınavın PER_QUESTION modunda sorunun ağırlığı; AUTO modunda yok sayılır.
+  points    Int          @default(1)
   sortOrder Int          @default(0)
   active    Boolean      @default(true)
   createdAt DateTime     @default(now())
@@ -243,6 +255,9 @@ model Exam {
   /// Havuzdan kaç soru sorulacak. 0 = havuzdaki tüm sorular.
   questionCount  Int     @default(0)
 
+  /// Soru puanlarının nasıl uygulanacağı.
+  scoringMode ScoringMode @default(AUTO)
+
   /// Geçmek için gereken yüzde.
   passPercent     Int  @default(80)
   /// 0 = sınırsız deneme.
@@ -272,8 +287,8 @@ model Checkpoint {
   /// null = süre sınırı yok.
   timeoutSeconds Int?
   onFail         CheckpointOnFail @default(START)
-  /// Yalnızca RETRY için anlamlı: null = doğru yapana kadar sınırsız deneme.
-  /// Sayı verilirse hak bitince video başa sarılır.
+  /// RETRY politikalarında anlamlı: null = doğru yapana kadar sınırsız deneme.
+  /// Sayı verilirse hak bitince onFail politikasına göre başa veya önceki noktaya sarılır.
   maxAttempts    Int?
   createdAt      DateTime         @default(now())
 

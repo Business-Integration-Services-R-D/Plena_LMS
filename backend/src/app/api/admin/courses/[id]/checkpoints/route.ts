@@ -15,7 +15,7 @@ const schema = z.object({
       /// null = süre sınırı yok.
       timeoutSeconds: z.number().int().min(5).max(600).nullable().default(60),
       onFail: z.nativeEnum(CheckpointOnFail).default(CheckpointOnFail.START),
-      /// Yalnızca RETRY için: null = sınırsız deneme.
+      /// RETRY politikalarında: null = sınırsız deneme.
       maxAttempts: z.number().int().min(1).max(20).nullable().default(null),
     }),
   ),
