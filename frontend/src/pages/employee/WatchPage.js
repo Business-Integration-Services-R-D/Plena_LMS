@@ -130,7 +130,14 @@ export default function WatchPage() {
           </div>
           {quiz.questions.map((q, i) => (
             <div key={q.question_id} className="n-card p-8" data-testid={`quiz-question-${i}`}>
-              <p className="text-xs uppercase tracking-[0.2em] font-medium text-gray-400 mb-3">Soru {i + 1} / {quiz.questions.length}</p>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <p className="text-xs uppercase tracking-[0.2em] font-medium text-gray-400">Soru {i + 1} / {quiz.questions.length}</p>
+                {quiz.scoring_mode === "per_question" && (
+                  <span className="text-xs font-medium text-gray-500 bg-[#F5F5F7] px-2.5 py-1 rounded-full" data-testid={`quiz-q${i}-points`}>
+                    {q.points} puan
+                  </span>
+                )}
+              </div>
               <p className="text-lg font-medium tracking-tight text-gray-900 mb-5">{q.text}</p>
               {q.qtype === "multiple_choice" ? (
                 <div className="space-y-2">

@@ -49,6 +49,7 @@ export async function GET() {
         questionCount: settings.questionCount,
         durationMinutes: settings.durationMinutes,
         retakePolicy: settings.retakePolicy,
+        scoringMode: settings.scoringMode,
         pool: pool
           ? { id: pool.id, name: pool.name, total: pool._count.questions }
           : null,

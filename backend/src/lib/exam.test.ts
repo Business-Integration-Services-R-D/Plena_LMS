@@ -38,12 +38,14 @@ describe("resolveExamSettings", () => {
       maxAttempts: 3,
       durationMinutes: 30,
       retakePolicy: "VIDEO_AND_TEST",
+      scoringMode: "PER_QUESTION",
     });
 
     expect(settings.questionPoolId).toBe("pool-yeni");
     expect(settings.passPercent).toBe(90);
     expect(settings.durationMinutes).toBe(30);
     expect(settings.retakePolicy).toBe("VIDEO_AND_TEST");
+    expect(settings.scoringMode).toBe("PER_QUESTION");
   });
 
   it("Exam kaydı yoksa Course üzerindeki eski ayarlara düşer", () => {
@@ -200,6 +202,78 @@ describe("gradeAttempt", () => {
 
     expect(result.scorePercent).toBe(0);
     expect(result.passed).toBe(false);
+  });
+
+  it("serbest metinde dolu cevabı doğru, boş cevabı yanlış sayar", () => {
+    const mixed = [
+      questions[0],
+      { id: "ft", type: "FREE_TEXT" as const, choices: [] },
+    ];
+
+    const answered = gradeAttempt(
+      mixed,
+      [
+        { questionId: "q1", choiceId: "a" },
+        { questionId: "ft", textAnswer: "  kendi cumlelerimle cevap  " },
+      ],
+      100,
+    );
+    expect(answered.scorePercent).toBe(100);
+    expect(answered.answers.find((a) => a.questionId === "ft")?.textAnswer).toBe(
+      "kendi cumlelerimle cevap",
+    );
+
+    const blank = gradeAttempt(
+      mixed,
+      [
+        { questionId: "q1", choiceId: "a" },
+        { questionId: "ft", textAnswer: "   " },
+      ],
+      100,
+    );
+    expect(blank.scorePercent).toBe(50);
+    expect(blank.passed).toBe(false);
+  });
+
+  it("AUTO modunda soru puanlarini yok sayar", () => {
+    const weighted = [
+      { ...questions[0], points: 9 },
+      { ...questions[1], points: 1 },
+    ];
+
+    const result = gradeAttempt(
+      weighted,
+      [{ questionId: "q1", choiceId: "a" }],
+      80,
+      "AUTO",
+    );
+
+    expect(result.scorePercent).toBe(50);
+  });
+
+  it("PER_QUESTION modunda soru puanlarina gore agirlik verir", () => {
+    const weighted = [
+      { ...questions[0], points: 9 },
+      { ...questions[1], points: 1 },
+    ];
+
+    const heavyCorrect = gradeAttempt(
+      weighted,
+      [{ questionId: "q1", choiceId: "a" }],
+      80,
+      "PER_QUESTION",
+    );
+    expect(heavyCorrect.scorePercent).toBe(90);
+    expect(heavyCorrect.passed).toBe(true);
+
+    const lightCorrect = gradeAttempt(
+      weighted,
+      [{ questionId: "q2", choiceId: "d" }],
+      80,
+      "PER_QUESTION",
+    );
+    expect(lightCorrect.scorePercent).toBe(10);
+    expect(lightCorrect.passed).toBe(false);
   });
 });
 

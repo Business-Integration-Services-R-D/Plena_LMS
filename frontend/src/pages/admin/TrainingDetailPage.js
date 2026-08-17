@@ -7,6 +7,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock } from "lucide-react";
 
 const inputCls = "w-full px-4 py-2.5 rounded-xl border border-black/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent";
+
+// Sınavın toplam puanı; soru puanlarının toplamı bunu geçemez.
+const MAX_TOTAL_POINTS = 100;
+
+// Soru puanı 1-100 arası tam sayı; boş/gecersiz giriş 1 sayılır.
+const clampPoints = (value) => {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(n, MAX_TOTAL_POINTS);
+};
 const btnPrimary = "px-5 py-2.5 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40";
 
 export default function TrainingDetailPage() {
@@ -17,6 +27,9 @@ export default function TrainingDetailPage() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [savingQuiz, setSavingQuiz] = useState(false);
   const [passEnabled, setPassEnabled] = useState(false);
+  // Sınav puanlaması: "auto" her soruyu eşit sayar, "per_question" puanları uygular.
+  const [scoringMode, setScoringMode] = useState("auto");
+  const [questionPoints, setQuestionPoints] = useState({});
   // Önizleme üzerinden kontrol noktası ekleme akışı
   const [previewTime, setPreviewTime] = useState(0);
   const [previewPaused, setPreviewPaused] = useState(true);
@@ -47,6 +60,8 @@ export default function TrainingDetailPage() {
   useEffect(() => {
     setSelectedIds(training?.quiz?.question_ids || []);
     setPassEnabled(training?.quiz?.pass_score != null);
+    setScoringMode(training?.quiz?.scoring_mode || "auto");
+    setQuestionPoints(training?.quiz?.question_points || {});
   }, [training]);
 
   const uploadVideo = async (file) => {
@@ -177,11 +192,34 @@ export default function TrainingDetailPage() {
     setSelectedIds((prev) => (prev.includes(qid) ? prev.filter((x) => x !== qid) : [...prev, qid]));
   };
 
+  // Sorunun puanı, diğer soruların toplamıyla birlikte 100'ü geçemez.
+  const setQuestionPoint = (qid, value, maxAllowed) => {
+    const n = Math.round(Number(value));
+    if (Number.isFinite(n) && n > maxAllowed) {
+      toast.error(
+        maxAllowed > 0
+          ? `Toplam puan ${MAX_TOTAL_POINTS} olabilir; bu soruya en fazla ${maxAllowed} puan verebilirsiniz.`
+          : `Toplam puan ${MAX_TOTAL_POINTS}'e ulaştı; önce diğer soruların puanını düşürün.`,
+      );
+      setQuestionPoints((prev) => ({ ...prev, [qid]: Math.max(1, maxAllowed) }));
+      return;
+    }
+    setQuestionPoints((prev) => ({ ...prev, [qid]: value }));
+  };
+
   const saveQuizQuestions = async () => {
     setSavingQuiz(true);
     try {
-      // Yalnızca soru listesi gönderilir; geçme notu ayrı akışta güncellenir.
-      const res = await api.put(`/trainings/${trainingId}`, { quiz: { question_ids: selectedIds } });
+      // Yalnızca soru listesi ve puanlama gönderilir; geçme notu ayrı akışta güncellenir.
+      const res = await api.put(`/trainings/${trainingId}`, {
+        quiz: {
+          question_ids: selectedIds,
+          question_points: Object.fromEntries(
+            selectedIds.map((id) => [id, clampPoints(questionPoints[id])]),
+          ),
+          scoring_mode: scoringMode,
+        },
+      });
       setTraining(res.data);
       toast.success(`Sınav güncellendi (${selectedIds.length} soru)`);
     } catch (e) {
@@ -206,7 +244,19 @@ export default function TrainingDetailPage() {
   const qById = Object.fromEntries(questions.map((q) => [q.question_id, q]));
   const cpSelectedIsFreeText = qById[cpInline.question_id]?.qtype === "free_text";
   const savedIds = training.quiz?.question_ids || [];
-  const quizDirty = selectedIds.length !== savedIds.length || selectedIds.some((id) => !savedIds.includes(id));
+  const savedPoints = training.quiz?.question_points || {};
+  const savedMode = training.quiz?.scoring_mode || "auto";
+  const selectionDirty =
+    selectedIds.length !== savedIds.length || selectedIds.some((id) => !savedIds.includes(id));
+  const pointsDirty =
+    scoringMode === "per_question" &&
+    selectedIds.some((id) => clampPoints(questionPoints[id]) !== (savedPoints[id] ?? 1));
+  const quizDirty = selectionDirty || pointsDirty || scoringMode !== savedMode;
+  const totalPoints = selectedIds.reduce(
+    (sum, id) => sum + (scoringMode === "per_question" ? clampPoints(questionPoints[id]) : 1),
+    0,
+  );
+  const pointsOverLimit = scoringMode === "per_question" && totalPoints > MAX_TOTAL_POINTS;
 
   return (
     <div className="fade-up" data-testid="training-detail-page">
@@ -467,11 +517,28 @@ export default function TrainingDetailPage() {
             <div>
               <h2 className="text-lg font-medium tracking-tight text-gray-900 mb-1">Eğitim Sonu Sınavı</h2>
               <p className="text-sm text-gray-400">
-                Soru havuzundan sınava soru seçin. {selectedIds.length} soru seçildi.
+                Soru havuzundan sınava soru seçin. {selectedIds.length} soru seçildi
+                {scoringMode === "per_question" && selectedIds.length > 0 && (
+                  <span className={pointsOverLimit ? "text-red-500 font-medium" : ""} data-testid="quiz-total-points">
+                    {" "}· toplam {totalPoints} / {MAX_TOTAL_POINTS} puan
+                  </span>
+                )}.
                 {quizDirty && <span className="text-amber-500"> · Kaydedilmemiş değişiklik var</span>}
               </p>
             </div>
             <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500 whitespace-nowrap">Puanlama:</span>
+                <select
+                  data-testid="quiz-scoring-mode-select"
+                  className={inputCls + " w-auto pr-9"}
+                  value={scoringMode}
+                  onChange={(e) => setScoringMode(e.target.value)}
+                >
+                  <option value="auto">Otomatik — her soru eşit</option>
+                  <option value="per_question">Soru başına puan</option>
+                </select>
+              </div>
               <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer select-none">
                 <input
                   data-testid="quiz-pass-score-toggle"
@@ -507,26 +574,57 @@ export default function TrainingDetailPage() {
             {questions.length === 0 && <p className="text-sm text-gray-400">Soru havuzu boş. Önce <Link to="/admin/questions" className="text-[#007AFF] hover:underline">soru ekleyin</Link>.</p>}
             {questions.map((q) => {
               const selected = selectedIds.includes(q.question_id);
+              // Bu soruya verilebilecek en yüksek puan = 100 - diğer soruların toplamı.
+              const ownPoints = clampPoints(questionPoints[q.question_id]);
+              const maxAllowed = Math.max(0, MAX_TOTAL_POINTS - (totalPoints - ownPoints));
               return (
-                <button
+                <div
                   key={q.question_id}
-                  data-testid={`quiz-question-toggle-${q.question_id}`}
-                  onClick={() => toggleQuizQuestion(q.question_id)}
-                  className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border text-left transition-colors ${selected ? "border-[#007AFF] bg-blue-50/50" : "border-black/5 bg-[#F7F7F5] hover:bg-[#F1F1EF]"}`}
+                  className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-colors ${selected ? "border-[#007AFF] bg-blue-50/50" : "border-black/5 bg-[#F7F7F5] hover:bg-[#F1F1EF]"}`}
                 >
-                  <CheckCircle2 className={`w-4 h-4 shrink-0 ${selected ? "text-[#007AFF]" : "text-gray-300"}`} />
-                  <span className="text-sm text-gray-800 flex-1">{q.text}</span>
+                  <button
+                    data-testid={`quiz-question-toggle-${q.question_id}`}
+                    onClick={() => toggleQuizQuestion(q.question_id)}
+                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                  >
+                    <CheckCircle2 className={`w-4 h-4 shrink-0 ${selected ? "text-[#007AFF]" : "text-gray-300"}`} />
+                    <span className="text-sm text-gray-800 flex-1">{q.text}</span>
+                  </button>
                   <span className="text-xs text-gray-400 whitespace-nowrap">{q.qtype === "multiple_choice" ? "Seçmeli" : "Metin"}</span>
-                </button>
+                  {scoringMode === "per_question" && selected && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <input
+                        data-testid={`quiz-question-points-${q.question_id}`}
+                        type="number"
+                        min="1"
+                        max={maxAllowed}
+                        aria-label="Soru puanı"
+                        title={`En fazla ${maxAllowed} puan`}
+                        className={`w-16 px-2 py-1.5 rounded-lg border bg-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent ${ownPoints > maxAllowed ? "border-red-400" : "border-black/10"}`}
+                        value={questionPoints[q.question_id] ?? 1}
+                        onChange={(e) => setQuestionPoint(q.question_id, e.target.value, maxAllowed)}
+                        onBlur={(e) => setQuestionPoint(q.question_id, clampPoints(e.target.value), maxAllowed)}
+                      />
+                      <span className="text-xs text-gray-400">puan</span>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
           {questions.length > 0 && (
-            <div className="flex items-center justify-end mt-6">
+            <div className="flex items-center justify-between gap-4 flex-wrap mt-6">
+              <p className={`text-xs ${pointsOverLimit ? "text-red-500" : "text-gray-400"}`}>
+                {pointsOverLimit
+                  ? `Soru puanlarının toplamı ${totalPoints}. Kaydetmek için toplamı ${MAX_TOTAL_POINTS} veya altına indirin.`
+                  : scoringMode === "per_question"
+                    ? `Puanların toplamı en fazla ${MAX_TOTAL_POINTS} olabilir. Serbest metin sorularda boş olmayan cevap sorunun tam puanını alır.`
+                    : "Çoktan seçmeli ve serbest metin sorular eşit ağırlıkta değerlendirilir."}
+              </p>
               <button
                 data-testid="quiz-save-questions-btn"
                 className={btnPrimary}
-                disabled={savingQuiz || !quizDirty}
+                disabled={savingQuiz || !quizDirty || pointsOverLimit}
                 onClick={saveQuizQuestions}
               >
                 <span className="flex items-center gap-2">

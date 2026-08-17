@@ -57,6 +57,14 @@ enum CheckpointOnFail {
   RETRY_PREVIOUS
 }
 
+/// Sınav puanlamasının nasıl yapılacağı.
+/// AUTO: her soru eşit ağırlıkta (soru puanları yok sayılır).
+/// PER_QUESTION: her soru kendi puanı kadar ağırlık taşır.
+enum ScoringMode {
+  AUTO
+  PER_QUESTION
+}
+
 /// Testi geçemeyen kullanıcının tekrar denerken ne yapması gerektiği.
 enum RetakePolicy {
   /// Sadece testi tekrar çözer.
@@ -159,6 +167,8 @@ model Question {
   poolId    String
   prompt    String
   type      QuestionType @default(MULTIPLE_CHOICE)
+  /// Sınavın PER_QUESTION modunda sorunun ağırlığı; AUTO modunda yok sayılır.
+  points    Int          @default(1)
   sortOrder Int          @default(0)
   active    Boolean      @default(true)
   createdAt DateTime     @default(now())
@@ -244,6 +254,9 @@ model Exam {
   questionPoolId String?
   /// Havuzdan kaç soru sorulacak. 0 = havuzdaki tüm sorular.
   questionCount  Int     @default(0)
+
+  /// Soru puanlarının nasıl uygulanacağı.
+  scoringMode ScoringMode @default(AUTO)
 
   /// Geçmek için gereken yüzde.
   passPercent     Int  @default(80)

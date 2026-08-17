@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AuditAction, Role } from "@prisma/client";
+import { AuditAction, Role, ScoringMode } from "@prisma/client";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
@@ -13,6 +13,7 @@ const schema = z.object({
   active: z.boolean().optional(),
   passPercent: z.number().min(0).max(100).optional(),
   questionPoolId: z.string().min(1).optional(),
+  scoringMode: z.nativeEnum(ScoringMode).optional(),
 });
 
 export async function PATCH(
@@ -36,7 +37,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Eğitim bulunamadı" }, { status: 404 });
   }
 
-  const { passPercent, questionPoolId, ...courseData } = parsed.data;
+  const { passPercent, questionPoolId, scoringMode, ...courseData } = parsed.data;
 
   if (questionPoolId) {
     const pool = await prisma.questionPool.findUnique({
@@ -57,14 +58,28 @@ export async function PATCH(
     },
   });
 
-  if ((passPercent !== undefined || questionPoolId) && course.exam) {
-    await prisma.exam.update({
-      where: { id: course.exam.id },
-      data: {
-        ...(passPercent !== undefined ? { passPercent } : {}),
-        ...(questionPoolId ? { questionPoolId } : {}),
-      },
-    });
+  const examData = {
+    ...(passPercent !== undefined ? { passPercent } : {}),
+    ...(questionPoolId ? { questionPoolId } : {}),
+    ...(scoringMode !== undefined ? { scoringMode } : {}),
+  };
+
+  if (Object.keys(examData).length > 0) {
+    if (course.exam) {
+      await prisma.exam.update({ where: { id: course.exam.id }, data: examData });
+    } else if (scoringMode !== undefined) {
+      // Puanlama modu yalnızca Exam üzerinde tutulur; eski kurslarda kayıt açılır.
+      await prisma.exam.create({
+        data: {
+          courseId: id,
+          questionPoolId: updated.questionPoolId,
+          questionCount: updated.questionCount,
+          passPercent: updated.passPercent,
+          maxAttempts: updated.maxAttempts,
+          scoringMode,
+        },
+      });
+    }
   }
 
   await recordAudit({
