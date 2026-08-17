@@ -703,6 +703,28 @@ const routes = [
   },
   {
     method: "GET",
+    pattern: /^\/reports\/free-text$/,
+    handler: async (_m, _b, query, config) => {
+      const courseId = config?.params?.training_id || query?.get("training_id");
+      const res = await http.get("/admin/reports/free-text", {
+        params: courseId ? { courseId } : {},
+      });
+      return res.data.rows.map((r) => ({
+        id: r.id,
+        source: r.source,
+        user_name: r.user?.name,
+        user_email: r.user?.email,
+        training_title: r.course?.title,
+        question_text: r.prompt,
+        answer_text: r.textAnswer,
+        position: r.positionSec ?? null,
+        attempt_no: r.attemptNo ?? null,
+        answered_at: r.answeredAt,
+      }));
+    },
+  },
+  {
+    method: "GET",
     pattern: /^\/reports\/assignments\/([^/]+)\/detail$/,
     handler: async (m) => {
       const res = await http.get(`/admin/enrollments/${m[1]}`);
@@ -752,6 +774,7 @@ const routes = [
             event_id: e.id,
             type: EVENT_MAP[e.eventType] || e.eventType,
             position: e.positionSec,
+            answer_text: e.metadata?.textAnswer || null,
             created_at: e.createdAt,
           })),
       };
@@ -955,6 +978,7 @@ const routes = [
         checkpointId: body.checkpoint_id,
         choiceId:
           body.answer_index != null ? choiceIds[body.answer_index] : undefined,
+        textAnswer: body.answer_text || undefined,
         textAnswer: body.answer_text || undefined,
         timedOut: !!body.timed_out,
       });

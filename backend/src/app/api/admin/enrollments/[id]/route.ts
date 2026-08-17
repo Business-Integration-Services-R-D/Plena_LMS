@@ -64,6 +64,7 @@ export async function GET(
       id: e.id,
       eventType: e.eventType,
       positionSec: e.positionSec,
+      metadata: e.metadata,
       createdAt: e.createdAt,
     })),
     quizAttempts: quizAttempts.map((a) => ({
