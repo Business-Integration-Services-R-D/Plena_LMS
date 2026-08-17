@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { videoUrl, fmtTime } from "@/lib/api";
-import { Play, Pause, Volume2, VolumeX, Lock } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Lock, Maximize, Minimize } from "lucide-react";
 
 export default function VideoPlayer({ trainingId, duration, checkpoints, initialProgress, onHeartbeat, onEvent, onCheckpoint, onEnded }) {
+  const playerRef = useRef(null);
   const videoRef = useRef(null);
   const maxRef = useRef(initialProgress.max_position || 0);
   const passedRef = useRef(new Set(initialProgress.checkpoints_passed || []));
@@ -18,6 +19,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
   const [submitting, setSubmitting] = useState(false);
   const [seekBlocked, setSeekBlocked] = useState(false);
   const [retryMsg, setRetryMsg] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const startedRef = useRef(false);
 
   const dur = duration || videoRef.current?.duration || 0;
@@ -48,6 +50,18 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement || document.webkitFullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+    };
   }, []);
 
   // checkpoint countdown
@@ -176,6 +190,19 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
     setMuted(nextVolume === 0);
   };
 
+  const toggleFullscreen = async () => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+      await exitFullscreen?.call(document);
+    } else {
+      const requestFullscreen = player.requestFullscreen || player.webkitRequestFullscreen;
+      await requestFullscreen?.call(player);
+    }
+  };
+
   const handleBarClick = (e) => {
     const v = videoRef.current;
     if (!v || !dur) return;
@@ -200,11 +227,15 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
   const q = activeCp?.question;
 
   return (
-    <div className="relative rounded-2xl overflow-hidden bg-black shadow-[0_20px_60px_rgb(0,0,0,0.15)]" data-testid="video-player">
+    <div
+      ref={playerRef}
+      className={`relative overflow-hidden bg-black shadow-[0_20px_60px_rgb(0,0,0,0.15)] ${isFullscreen ? "h-screen flex items-center rounded-none" : "rounded-2xl"}`}
+      data-testid="video-player"
+    >
       <video
         ref={videoRef}
         src={videoUrl(trainingId)}
-        className="w-full block"
+        className="w-full max-h-full block"
         onTimeUpdate={handleTimeUpdate}
         onSeeking={handleSeeking}
         onEnded={handleEnded}
@@ -261,6 +292,14 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
               aria-label="Ses seviyesi"
               className="w-20 h-1 accent-white cursor-pointer"
             />
+            <button
+              data-testid="video-fullscreen-btn"
+              onClick={toggleFullscreen}
+              className="text-white/70 hover:text-white transition-colors"
+              aria-label={isFullscreen ? "Tam ekrandan çık" : "Tam ekran"}
+            >
+              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+            </button>
           </div>
         </div>
       </div>
