@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus, Trash2 } from "lucide-react";
 
-const inputCls = "w-full px-4 py-2.5 rounded-xl border border-black/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#007AFF] focus:border-transparent";
-const btnPrimary = "px-5 py-2.5 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40";
+const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
+const btnPrimary = "px-5 py-2.5 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow] disabled:opacity-40";
 
 export default function AssignmentsPage() {
   const [assignments, setAssignments] = useState([]);
@@ -63,10 +63,10 @@ export default function AssignmentsPage() {
           </button>
         }
       />
-      <div className="n-card overflow-hidden">
+      <div className="n-card n-card-brand overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-left text-[11px] uppercase tracking-wider text-gray-400 border-b n-hairline bg-[#FAFAF9]">
+            <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b n-hairline bg-[#F5F8FA]">
               <th className="px-6 py-4 font-medium">Kullanıcı</th>
               <th className="px-6 py-4 font-medium">Eğitim</th>
               <th className="px-6 py-4 font-medium">Durum</th>
@@ -78,23 +78,23 @@ export default function AssignmentsPage() {
           </thead>
           <tbody>
             {assignments.length === 0 && (
-              <tr><td colSpan="7" className="px-6 py-10 text-center text-gray-400">Henüz atama yok.</td></tr>
+              <tr><td colSpan="7" className="px-6 py-10 text-center text-slate-400">Henüz atama yok.</td></tr>
             )}
             {assignments.map((a) => (
-              <tr key={a.assignment_id} className="border-b border-black/5 last:border-0 hover:bg-gray-50/50" data-testid={`assignment-row-${a.assignment_id}`}>
+              <tr key={a.assignment_id} className="border-b border-navy-900/5 last:border-0 hover:bg-slate-50/60" data-testid={`assignment-row-${a.assignment_id}`}>
                 <td className="px-6 py-4">
-                  <p className="font-medium text-gray-900">{a.user_name}</p>
-                  <p className="text-xs text-gray-400">{a.user_email}</p>
+                  <p className="font-medium text-navy-950">{a.user_name}</p>
+                  <p className="text-xs text-slate-400">{a.user_email}</p>
                 </td>
-                <td className="px-6 py-4 text-gray-700">{a.training_title}</td>
+                <td className="px-6 py-4 text-slate-700">{a.training_title}</td>
                 <td className="px-6 py-4">
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLOR[a.status]}`}>{STATUS_TR[a.status]}</span>
                 </td>
-                <td className="px-6 py-4 text-gray-400">{fmtDate(a.start_at)}</td>
-                <td className="px-6 py-4 text-gray-400">{fmtDate(a.due_at)}</td>
-                <td className="px-6 py-4 text-gray-400">{a.reminder_days ? `${a.reminder_days} günde bir` : "-"}</td>
+                <td className="px-6 py-4 text-slate-400">{fmtDate(a.start_at)}</td>
+                <td className="px-6 py-4 text-slate-400">{fmtDate(a.due_at)}</td>
+                <td className="px-6 py-4 text-slate-400">{a.reminder_days ? `${a.reminder_days} günde bir` : "-"}</td>
                 <td className="px-6 py-4 text-right">
-                  <button data-testid={`delete-assignment-${a.assignment_id}`} onClick={() => remove(a)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                  <button data-testid={`delete-assignment-${a.assignment_id}`} onClick={() => remove(a)} className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </td>
@@ -113,26 +113,26 @@ export default function AssignmentsPage() {
               {trainings.filter((t) => t.video_filename).map((t) => <option key={t.training_id} value={t.training_id}>{t.title}</option>)}
             </select>
             <div>
-              <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">Kullanıcılar</p>
-              <div className="max-h-40 overflow-y-auto border border-black/5 rounded-xl divide-y divide-black/5">
+              <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">Kullanıcılar</p>
+              <div className="max-h-40 overflow-y-auto border border-navy-900/5 rounded-xl divide-y divide-navy-900/5">
                 {users.filter((u) => u.role === "employee").map((u) => (
-                  <label key={u.user_id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50">
-                    <input type="checkbox" data-testid={`assign-user-${u.email}`} checked={form.user_ids.includes(u.user_id)} onChange={() => toggle("user_ids", u.user_id)} className="accent-black" />
-                    <span className="text-sm text-gray-800">{u.name}</span>
-                    <span className="text-xs text-gray-400 ml-auto">{u.email}</span>
+                  <label key={u.user_id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50">
+                    <input type="checkbox" data-testid={`assign-user-${u.email}`} checked={form.user_ids.includes(u.user_id)} onChange={() => toggle("user_ids", u.user_id)} className="accent-navy-900" />
+                    <span className="text-sm text-slate-700">{u.name}</span>
+                    <span className="text-xs text-slate-400 ml-auto">{u.email}</span>
                   </label>
                 ))}
               </div>
             </div>
             {groups.length > 0 && (
               <div>
-                <p className="text-xs uppercase tracking-wider text-gray-400 mb-2">Gruplar</p>
-                <div className="max-h-32 overflow-y-auto border border-black/5 rounded-xl divide-y divide-black/5">
+                <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">Gruplar</p>
+                <div className="max-h-32 overflow-y-auto border border-navy-900/5 rounded-xl divide-y divide-navy-900/5">
                   {groups.map((g) => (
-                    <label key={g.group_id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50">
-                      <input type="checkbox" data-testid={`assign-group-${g.name}`} checked={form.group_ids.includes(g.group_id)} onChange={() => toggle("group_ids", g.group_id)} className="accent-black" />
-                      <span className="text-sm text-gray-800">{g.name}</span>
-                      <span className="text-xs text-gray-400 ml-auto">{(g.member_ids || []).length} üye</span>
+                    <label key={g.group_id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50">
+                      <input type="checkbox" data-testid={`assign-group-${g.name}`} checked={form.group_ids.includes(g.group_id)} onChange={() => toggle("group_ids", g.group_id)} className="accent-navy-900" />
+                      <span className="text-sm text-slate-700">{g.name}</span>
+                      <span className="text-xs text-slate-400 ml-auto">{(g.member_ids || []).length} üye</span>
                     </label>
                   ))}
                 </div>
@@ -140,16 +140,16 @@ export default function AssignmentsPage() {
             )}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-xs text-gray-400 mb-1.5">Başlangıç (boş = hemen)</p>
+                <p className="text-xs text-slate-400 mb-1.5">Başlangıç (boş = hemen)</p>
                 <input data-testid="assignment-start-input" type="datetime-local" className={inputCls} value={form.start_at} onChange={(e) => setForm({ ...form, start_at: e.target.value })} />
               </div>
               <div>
-                <p className="text-xs text-gray-400 mb-1.5">Son tarih (opsiyonel)</p>
+                <p className="text-xs text-slate-400 mb-1.5">Son tarih (opsiyonel)</p>
                 <input data-testid="assignment-due-input" type="datetime-local" className={inputCls} value={form.due_at} onChange={(e) => setForm({ ...form, due_at: e.target.value })} />
               </div>
             </div>
             <div>
-              <p className="text-xs text-gray-400 mb-1.5">Hatırlatma periyodu (gün, 0 = kapalı)</p>
+              <p className="text-xs text-slate-400 mb-1.5">Hatırlatma periyodu (gün, 0 = kapalı)</p>
               <input data-testid="assignment-reminder-input" type="number" min="0" className={inputCls} value={form.reminder_days} onChange={(e) => setForm({ ...form, reminder_days: e.target.value })} />
             </div>
             <button data-testid="assignment-create-btn" className={btnPrimary + " w-full"} disabled={!form.training_id || (form.user_ids.length === 0 && form.group_ids.length === 0)} onClick={create}>
