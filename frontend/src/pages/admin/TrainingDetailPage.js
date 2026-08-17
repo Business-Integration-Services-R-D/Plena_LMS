@@ -34,7 +34,7 @@ export default function TrainingDetailPage() {
   // Kontrol noktası için soru kaynağı: havuzdan seç / yeni soru yaz (popup)
   const [cpSource, setCpSource] = useState("pool");
   const [cpQModal, setCpQModal] = useState(false);
-  const [cpQForm, setCpQForm] = useState({ text: "", options: ["", ""], correct_index: 0 });
+  const [cpQForm, setCpQForm] = useState({ text: "", qtype: "multiple_choice", options: ["", ""], correct_index: 0 });
   const [cpQSaving, setCpQSaving] = useState(false);
   const fileRef = useRef(null);
   const previewRef = useRef(null);
@@ -106,19 +106,34 @@ export default function TrainingDetailPage() {
     setCpPanelOpen(true);
   };
 
+  // Serbest metinde deneme hakkı politikaları anlamsızdır; sarma hedefi korunur.
+  const selectCpQuestion = (questionId) => {
+    const isFreeText = questions.find((q) => q.question_id === questionId)?.qtype === "free_text";
+    setCpInline((f) => ({
+      ...f,
+      question_id: questionId,
+      on_fail: isFreeText && f.on_fail !== "previous" ? "start" : f.on_fail,
+    }));
+  };
+
   // Popup'tan yeni soru: soru havuzuna eklenir ve kontrol noktası için seçilir.
   const saveCpQuestion = async () => {
     setCpQSaving(true);
     try {
       const res = await api.post("/questions", {
         text: cpQForm.text,
-        qtype: "multiple_choice",
-        options: cpQForm.options.filter((o) => o.trim()),
-        correct_index: cpQForm.correct_index,
+        qtype: cpQForm.qtype,
+        options: cpQForm.qtype === "free_text" ? [] : cpQForm.options.filter((o) => o.trim()),
+        correct_index: cpQForm.qtype === "free_text" ? null : cpQForm.correct_index,
         category: "",
       });
       setQuestions((prev) => [...prev, res.data]);
-      setCpInline((f) => ({ ...f, question_id: res.data.question_id }));
+      setCpInline((f) => ({
+        ...f,
+        question_id: res.data.question_id,
+        on_fail:
+          cpQForm.qtype === "free_text" && f.on_fail !== "previous" ? "start" : f.on_fail,
+      }));
       setCpQModal(false);
       setCpSource("pool");
       toast.success("Soru havuza eklendi ve kontrol noktası için seçildi");
@@ -189,6 +204,7 @@ export default function TrainingDetailPage() {
   if (!training) return <div className="w-6 h-6 border-2 border-gray-300 border-t-black rounded-full animate-spin" />;
 
   const qById = Object.fromEntries(questions.map((q) => [q.question_id, q]));
+  const cpSelectedIsFreeText = qById[cpInline.question_id]?.qtype === "free_text";
   const savedIds = training.quiz?.question_ids || [];
   const quizDirty = selectedIds.length !== savedIds.length || selectedIds.some((id) => !savedIds.includes(id));
 
@@ -272,7 +288,7 @@ export default function TrainingDetailPage() {
                         name="cp-question-source"
                         className="accent-black"
                         checked={cpSource === "new"}
-                        onChange={() => { setCpSource("new"); setCpQForm({ text: "", options: ["", ""], correct_index: 0 }); setCpQModal(true); }}
+                        onChange={() => { setCpSource("new"); setCpQForm({ text: "", qtype: "multiple_choice", options: ["", ""], correct_index: 0 }); setCpQModal(true); }}
                       />
                       Yeni bir soru yazmak istiyorum
                     </label>
@@ -290,23 +306,32 @@ export default function TrainingDetailPage() {
                   </div>
                   {cpSource === "pool" && (
                   <>
-                  <select data-testid="cp-preview-question-select" className={inputCls} value={cpInline.question_id} onChange={(e) => setCpInline({ ...cpInline, question_id: e.target.value })}>
+                  <select data-testid="cp-preview-question-select" className={inputCls} value={cpInline.question_id} onChange={(e) => selectCpQuestion(e.target.value)}>
                     <option value="">Sorulacak soruyu seçin...</option>
-                    {/* Serbest metin soruların doğru cevabı olmadığı için kontrol noktasında kullanılamaz */}
-                    {questions.filter((q) => q.qtype === "multiple_choice").map((q) => <option key={q.question_id} value={q.question_id}>{q.text.slice(0, 80)}</option>)}
+                    {questions.map((q) => (
+                      <option key={q.question_id} value={q.question_id}>
+                        {q.qtype === "free_text" ? "[Metin] " : ""}{q.text.slice(0, 80)}
+                      </option>
+                    ))}
                   </select>
                   {cpInline.question_id && qById[cpInline.question_id] && (
-                    <div className="space-y-1.5">
-                      {(qById[cpInline.question_id].options || []).map((o, i) => {
-                        const correct = i === qById[cpInline.question_id].correct_index;
-                        return (
-                          <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${correct ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-black/5 bg-white text-gray-600"}`}>
-                            <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${correct ? "text-emerald-500" : "text-gray-200"}`} />
-                            {o}
-                          </div>
-                        );
-                      })}
-                    </div>
+                    cpSelectedIsFreeText ? (
+                      <p className="px-3 py-2 rounded-lg text-xs text-amber-700 bg-amber-50 border border-amber-200">
+                        Serbest metin soru: doğru cevap yoktur. Boş olmayan bir cevap yazan kullanıcı geçer, cevap raporlarda görünür.
+                      </p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {(qById[cpInline.question_id].options || []).map((o, i) => {
+                          const correct = i === qById[cpInline.question_id].correct_index;
+                          return (
+                            <div key={i} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${correct ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-black/5 bg-white text-gray-600"}`}>
+                              <CheckCircle2 className={`w-3.5 h-3.5 shrink-0 ${correct ? "text-emerald-500" : "text-gray-200"}`} />
+                              {o}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )
                   )}
                   <div className="flex items-center gap-5">
                     <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
@@ -338,13 +363,27 @@ export default function TrainingDetailPage() {
                       <span className="text-xs text-gray-400 whitespace-nowrap">saniye içinde cevaplanmalı</span>
                     </div>
                   )}
-                  <select data-testid="cp-preview-onfail-select" className={inputCls} value={cpInline.on_fail} onChange={(e) => setCpInline({ ...cpInline, on_fail: e.target.value })}>
-                    <option value="start">Başarısızsa: Başa dön</option>
-                    <option value="previous">Başarısızsa: Önceki nokta</option>
-                    <option value="retry_limited">Başarısızsa: Deneme hakkı olsun</option>
-                    <option value="retry">Başarısızsa: Doğru yapana kadar deneyebilsin</option>
-                  </select>
-                  {cpInline.on_fail === "retry_limited" && (
+                  {/* Serbest metinde yanlış cevap yoktur; yalnızca süre aşımı başarısızlık sayılır. */}
+                  {cpSelectedIsFreeText ? (
+                    cpInline.has_timeout ? (
+                      <select data-testid="cp-preview-onfail-select" className={inputCls} value={cpInline.on_fail} onChange={(e) => setCpInline({ ...cpInline, on_fail: e.target.value })}>
+                        <option value="start">Süre dolarsa: Başa dön</option>
+                        <option value="previous">Süre dolarsa: Önceki nokta</option>
+                      </select>
+                    ) : (
+                      <p className="px-3 py-2 rounded-lg text-xs text-gray-500 bg-white border border-black/10">
+                        Süre sınırı olmadığı için başarısızlık durumu yoktur; kullanıcı cevabını yazana kadar video devam etmez.
+                      </p>
+                    )
+                  ) : (
+                    <select data-testid="cp-preview-onfail-select" className={inputCls} value={cpInline.on_fail} onChange={(e) => setCpInline({ ...cpInline, on_fail: e.target.value })}>
+                      <option value="start">Başarısızsa: Başa dön</option>
+                      <option value="previous">Başarısızsa: Önceki nokta</option>
+                      <option value="retry_limited">Başarısızsa: Deneme hakkı olsun</option>
+                      <option value="retry">Başarısızsa: Doğru yapana kadar deneyebilsin</option>
+                    </select>
+                  )}
+                  {!cpSelectedIsFreeText && cpInline.on_fail === "retry_limited" && (
                     <div className="space-y-3 fade-up">
                       <div className="flex items-center gap-2">
                         <input data-testid="cp-preview-attempts-input" type="number" min="1" max="20" className={inputCls + " w-28"} value={cpInline.attempts} onChange={(e) => setCpInline({ ...cpInline, attempts: e.target.value })} />
@@ -506,26 +545,42 @@ export default function TrainingDetailPage() {
           <DialogHeader><DialogTitle>Yeni Soru</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <textarea data-testid="cp-question-text-input" className={inputCls + " min-h-[80px]"} placeholder="Soru metni" value={cpQForm.text} onChange={(e) => setCpQForm({ ...cpQForm, text: e.target.value })} />
-            <select data-testid="cp-question-type-select" className={inputCls} value="multiple_choice" disabled>
+            <select
+              data-testid="cp-question-type-select"
+              className={inputCls}
+              value={cpQForm.qtype}
+              onChange={(e) => setCpQForm({ ...cpQForm, qtype: e.target.value })}
+            >
               <option value="multiple_choice">Çoktan Seçmeli</option>
+              <option value="free_text">Serbest Metin</option>
             </select>
-            <div className="space-y-2">
-              <p className="text-xs text-gray-400">Seçenekler — doğru cevabı işaretleyin</p>
-              {cpQForm.options.map((o, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <input type="radio" data-testid={`cp-correct-option-${i}`} name="cp-q-correct" checked={cpQForm.correct_index === i} onChange={() => setCpQForm({ ...cpQForm, correct_index: i })} className="accent-emerald-600" />
-                  <input data-testid={`cp-option-input-${i}`} className={inputCls} placeholder={`Seçenek ${i + 1}`} value={o} onChange={(e) => setCpQOption(i, e.target.value)} />
-                  {cpQForm.options.length > 2 && (
-                    <button onClick={() => setCpQForm({ ...cpQForm, options: cpQForm.options.filter((_, j) => j !== i), correct_index: 0 })} className="p-2 text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
-                  )}
-                </div>
-              ))}
-              <button data-testid="cp-add-option-btn" onClick={() => setCpQForm({ ...cpQForm, options: [...cpQForm.options, ""] })} className="text-sm text-[#007AFF] font-medium hover:underline">+ Seçenek ekle</button>
-            </div>
+            {cpQForm.qtype === "multiple_choice" ? (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-400">Seçenekler — doğru cevabı işaretleyin</p>
+                {cpQForm.options.map((o, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input type="radio" data-testid={`cp-correct-option-${i}`} name="cp-q-correct" checked={cpQForm.correct_index === i} onChange={() => setCpQForm({ ...cpQForm, correct_index: i })} className="accent-emerald-600" />
+                    <input data-testid={`cp-option-input-${i}`} className={inputCls} placeholder={`Seçenek ${i + 1}`} value={o} onChange={(e) => setCpQOption(i, e.target.value)} />
+                    {cpQForm.options.length > 2 && (
+                      <button onClick={() => setCpQForm({ ...cpQForm, options: cpQForm.options.filter((_, j) => j !== i), correct_index: 0 })} className="p-2 text-gray-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                    )}
+                  </div>
+                ))}
+                <button data-testid="cp-add-option-btn" onClick={() => setCpQForm({ ...cpQForm, options: [...cpQForm.options, ""] })} className="text-sm text-[#007AFF] font-medium hover:underline">+ Seçenek ekle</button>
+              </div>
+            ) : (
+              <p className="px-3 py-2 rounded-lg text-xs text-amber-700 bg-amber-50 border border-amber-200">
+                Serbest metin soruda doğru cevap yoktur. Kullanıcı boş olmayan bir cevap yazarsa videoya devam eder; cevap raporlarda değerlendirmeniz için listelenir.
+              </p>
+            )}
             <button
               data-testid="cp-question-save-btn"
               className={btnPrimary + " w-full"}
-              disabled={cpQSaving || !cpQForm.text.trim() || cpQForm.options.filter((o) => o.trim()).length < 2}
+              disabled={
+                cpQSaving ||
+                !cpQForm.text.trim() ||
+                (cpQForm.qtype === "multiple_choice" && cpQForm.options.filter((o) => o.trim()).length < 2)
+              }
               onClick={saveCpQuestion}
             >
               {cpQSaving ? "Kaydediliyor..." : "Kaydet"}

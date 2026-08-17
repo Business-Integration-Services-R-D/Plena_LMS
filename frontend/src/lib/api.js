@@ -852,7 +852,7 @@ const routes = [
               : "start",
           question: {
             text: cp.question.prompt,
-            qtype: "multiple_choice",
+            qtype: cp.question.type === "FREE_TEXT" ? "free_text" : "multiple_choice",
             options: cp.question.choices.map((c) => c.text),
           },
         };
@@ -955,6 +955,7 @@ const routes = [
         checkpointId: body.checkpoint_id,
         choiceId:
           body.answer_index != null ? choiceIds[body.answer_index] : undefined,
+        textAnswer: body.answer_text || undefined,
         timedOut: !!body.timed_out,
       });
       return {
