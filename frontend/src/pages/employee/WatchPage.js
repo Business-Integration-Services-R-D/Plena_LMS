@@ -7,11 +7,30 @@ import { ArrowLeft, CheckCircle2, PartyPopper } from "lucide-react";
 
 const btnPrimary = "px-8 py-3 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40";
 
+// Sınav cevapları gönderilene kadar tarayıcıda tutulur; sayfa yenilenirse kaybolmaz.
+const draftKey = (assignmentId) => `plena.quiz-draft.${assignmentId}`;
+
+const readQuizDraft = (assignmentId) => {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(draftKey(assignmentId)));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeQuizDraft = (assignmentId, answers) => {
+  try {
+    if (Object.keys(answers).length === 0) localStorage.removeItem(draftKey(assignmentId));
+    else localStorage.setItem(draftKey(assignmentId), JSON.stringify(answers));
+  } catch {}
+};
+
 export default function WatchPage() {
   const { assignmentId } = useParams();
   const [data, setData] = useState(null);
   const [stage, setStage] = useState(null); // video | quiz | result | done
-  const [quizAnswers, setQuizAnswers] = useState({});
+  const [quizAnswers, setQuizAnswers] = useState(() => readQuizDraft(assignmentId));
   const [result, setResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -25,6 +44,22 @@ export default function WatchPage() {
   }, [assignmentId]);
 
   useEffect(() => { load().catch(() => toast.error("Eğitim yüklenemedi")); }, [load]);
+
+  // Başka bir eğitime geçildiğinde o eğitimin taslağı yüklenir.
+  useEffect(() => { setQuizAnswers(readQuizDraft(assignmentId)); }, [assignmentId]);
+
+  // Sorular değişmişse (havuz güncellenmiş olabilir) artık geçersiz cevaplar atılır.
+  useEffect(() => {
+    const questions = data?.training?.quiz?.questions;
+    if (!questions?.length) return;
+    const ids = new Set(questions.map((q) => q.question_id));
+    setQuizAnswers((prev) => {
+      const kept = Object.fromEntries(Object.entries(prev).filter(([id]) => ids.has(id)));
+      return Object.keys(kept).length === Object.keys(prev).length ? prev : kept;
+    });
+  }, [data]);
+
+  useEffect(() => { writeQuizDraft(assignmentId, quizAnswers); }, [assignmentId, quizAnswers]);
 
   const onHeartbeat = useCallback(async (position, playing) => {
     const res = await api.post(`/learn/${assignmentId}/heartbeat`, { position, playing });
@@ -71,6 +106,7 @@ export default function WatchPage() {
         answer_text: quizAnswers[q.question_id]?.text ?? null,
       }));
       const res = await api.post(`/learn/${assignmentId}/quiz`, { answers });
+      setQuizAnswers({});
       setResult(res.data);
       setStage("result");
     } catch (e) {
@@ -124,9 +160,10 @@ export default function WatchPage() {
 
       {stage === "quiz" && quiz && (
         <div className="space-y-5" data-testid="quiz-view">
-          <div className="n-card p-6 flex items-center gap-3">
+          <div className="n-card p-6 flex items-center gap-3 flex-wrap">
             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
             <p className="text-sm text-gray-700">Video tamamlandı. Sınavı bitirerek eğitimi tamamlayın.{quiz.pass_score ? ` Geçme notu: %${quiz.pass_score}` : ""}</p>
+            <p className="text-xs text-gray-400 ml-auto">Cevaplarınız bu tarayıcıda saklanır; sayfayı yenilerseniz kaybolmaz</p>
           </div>
           {quiz.questions.map((q, i) => (
             <div key={q.question_id} className="n-card p-8" data-testid={`quiz-question-${i}`}>
