@@ -9,6 +9,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
   const activeCpRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
   const [current, setCurrent] = useState(initialProgress.current_position || 0);
   const [maxPos, setMaxPos] = useState(initialProgress.max_position || 0);
   const [activeCp, setActiveCp] = useState(null);
@@ -163,6 +164,18 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
     }
   };
 
+  const toggleMute = () => {
+    setMuted((value) => !value);
+  };
+
+  const handleVolumeChange = (e) => {
+    const nextVolume = Number(e.target.value);
+    const v = videoRef.current;
+    if (v) v.volume = nextVolume;
+    setVolume(nextVolume);
+    setMuted(nextVolume === 0);
+  };
+
   const handleBarClick = (e) => {
     const v = videoRef.current;
     if (!v || !dur) return;
@@ -229,9 +242,25 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
                 <Lock className="w-3 h-3" /> İleri sarma kapalı
               </span>
             )}
-            <button data-testid="video-mute-btn" onClick={() => setMuted((m) => !m)} className="text-white/70 hover:text-white transition-colors">
-              {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            <button
+              data-testid="video-mute-btn"
+              onClick={toggleMute}
+              className="text-white/70 hover:text-white transition-colors"
+              aria-label={muted || volume === 0 ? "Sesi aç" : "Sesi kapat"}
+            >
+              {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
             </button>
+            <input
+              data-testid="video-volume-slider"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={volume}
+              onChange={handleVolumeChange}
+              aria-label="Ses seviyesi"
+              className="w-20 h-1 accent-white cursor-pointer"
+            />
           </div>
         </div>
       </div>
