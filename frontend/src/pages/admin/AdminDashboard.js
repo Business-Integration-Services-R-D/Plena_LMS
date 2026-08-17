@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
-import { PageHeader } from "@/components/Layout";
+import { useAuth } from "@/context/AuthContext";
 import { Users, Clapperboard, Send, CheckCircle2, HelpCircle, TrendingUp, ArrowRight } from "lucide-react";
-import { OceanBanner } from "@/components/brand/Decoration";
+import { HeroBanner } from "@/components/brand/HeroBanner";
 
 const StatCard = ({ icon: Icon, label, value, tint, hero, testId }) => (
   <div data-testid={testId} className={`n-card n-card-hover p-6 h-full ${hero ? "n-card-brand" : ""}`}>
     <div
-      className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${
+      className={`w-10 h-10 rounded-full flex items-center justify-center mb-4 ${
         hero ? "bg-gradient-to-br from-cyan-500 to-navy-800 text-white shadow-glow-cyan-sm" : tint
       }`}
     >
@@ -20,6 +20,7 @@ const StatCard = ({ icon: Icon, label, value, tint, hero, testId }) => (
 );
 
 export default function AdminDashboard() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
 
   useEffect(() => {
@@ -32,19 +33,19 @@ export default function AdminDashboard() {
 
   return (
     <div className="fade-up" data-testid="admin-dashboard">
-      <PageHeader
-        overline="Genel Bakış"
-        title="Hoş geldiniz"
-        subtitle="Platformun genel durumu ve eğitim ilerlemeleri."
-        action={<OceanBanner className="h-16 w-40 rounded-[13px] hidden sm:block" />}
+      <HeroBanner
+        testId="admin-welcome-banner"
+        overline="GENEL BAKIŞ"
+        title={`Hoş geldiniz, ${user?.name || "Sistem Yöneticisi"}`}
+        subtitle="Martı Denizcilik LMS platformuna hoş geldiniz."
       />
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-10">
         <StatCard testId="stat-users" icon={Users} label="Çalışan" value={data.total_users} hero />
-        <StatCard testId="stat-trainings" icon={Clapperboard} label="Eğitim" value={data.total_trainings} tint="bg-navy-50 text-navy-700" />
+        <StatCard testId="stat-trainings" icon={Clapperboard} label="Eğitim" value={data.total_trainings} tint="bg-indigo-50 text-indigo-600" />
         <StatCard testId="stat-questions" icon={HelpCircle} label="Soru" value={data.total_questions} tint="bg-amber-50 text-amber-600" />
-        <StatCard testId="stat-assignments" icon={Send} label="Atama" value={data.total_assignments} tint="bg-slate-100 text-slate-700" />
+        <StatCard testId="stat-assignments" icon={Send} label="Atama" value={data.total_assignments} tint="bg-brand-50 text-brand-700" />
         <StatCard testId="stat-completed" icon={CheckCircle2} label="Tamamlanan" value={data.completed} tint="bg-emerald-50 text-emerald-600" />
-        <StatCard testId="stat-completion-rate" icon={TrendingUp} label="Tamamlanma" value={`%${data.completion_rate}`} tint="bg-rose-50 text-rose-600" />
+        <StatCard testId="stat-completion-rate" icon={TrendingUp} label="Tamamlanma" value={`%${data.completion_rate}`} tint="bg-cyan-50 text-cyan-700" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="n-card p-8">

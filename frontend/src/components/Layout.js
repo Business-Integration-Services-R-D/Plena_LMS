@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, HelpCircle, Clapperboard, Send, BarChart3, Mail, LogOut, BookOpen,
 } from "lucide-react";
 import { BrandLockup } from "@/components/brand/MartiMark";
-import { WaveLine, RouteRule, WaveGlyph } from "@/components/brand/Decoration";
+import { WaveLine, RouteRule, WaveGlyph, MapDots } from "@/components/brand/Decoration";
 
 const adminNav = [
   { to: "/admin", label: "Genel Bakış", icon: LayoutDashboard, end: true },
@@ -65,8 +65,9 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen bg-[#F4F7FA] flex">
       <aside className="w-64 shrink-0 bg-gradient-to-b from-navy-950 via-navy-950 to-[#081826] flex flex-col fixed inset-y-0 z-20 overflow-hidden">
-        {/* Ambient brand glow + wave rhythm — atmospheric only, no literal iconography */}
+        {/* Ambient brand glow + wave/route rhythm — atmospheric only, no literal iconography */}
         <div className="absolute -top-24 -right-20 w-56 h-56 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none" aria-hidden="true" />
+        <MapDots className="absolute top-16 right-0 w-24 h-16 text-white/[0.05] pointer-events-none" />
         <div className="absolute bottom-0 inset-x-0 h-40 pointer-events-none opacity-[0.07] text-cyan-300" aria-hidden="true">
           <WaveLine className="w-full h-8 absolute bottom-24" />
           <WaveLine className="w-full h-8 absolute bottom-14" />
@@ -139,6 +140,9 @@ export const PageHeader = ({ overline, title, subtitle, action }) => (
       </div>
       {action}
     </div>
-    <div className="mt-6 h-px bg-gradient-to-r from-navy-900/10 via-cyan-500/25 to-transparent" />
+    <div className="relative mt-6 h-px overflow-visible">
+      <div className="absolute inset-0 bg-gradient-to-r from-navy-900/10 via-cyan-500/20 to-transparent" />
+      <WaveLine className="absolute -top-[7px] left-0 w-full h-3.5 text-cyan-500/25" />
+    </div>
   </div>
 );
