@@ -27,7 +27,12 @@ export const toUiUser = (u) =>
         name: u.name,
         role: toUiRole(u.role),
         picture: u.picture || null,
-        status: u.active === false ? "invited" : "active",
+        status:
+          u.active !== false
+            ? "active"
+            : u.activationSent
+              ? "invited"
+              : "pending_activation",
         created_at: u.createdAt || null,
       }
     : null;
@@ -364,15 +369,31 @@ const routes = [
       return res.data;
     },
   },
-
+  {
+    method: "GET",
+    pattern: /^\/auth\/activate$/,
+    handler: async (_m, _body, query) => {
+      const res = await http.get("/auth/activate", {
+        params: { token: query.get("token") },
+      });
+      return res.data;
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/auth\/activate$/,
+    handler: async (_m, body) => {
+      const res = await http.post("/auth/activate", body);
+      return toUiUser(res.data);
+    },
+  },
   // --- Admin: kullanıcılar ---
   {
     method: "GET",
     pattern: /^\/users$/,
     handler: async () => {
       const res = await http.get("/admin/users");
-      // Pasifleştirilen (silinen) kullanıcılar listede gösterilmez.
-      return res.data.filter((u) => u.active).map(toUiUser);
+      return res.data.map(toUiUser);
     },
   },
   {
@@ -382,26 +403,32 @@ const routes = [
       const res = await http.post("/admin/users", {
         email: body.email,
         name: body.name,
-        password: body.password,
         role: toEduRole(body.role),
+        sendActivation: Boolean(body.sendActivation),
+        ...(body.password ? { password: body.password } : {}),
       });
-      return toUiUser(res.data);
+      return {
+        ...toUiUser(res.data),
+        activation_email_sent: res.data.activationEmailSent,
+        activation_email_error: res.data.activationEmailError,
+      };
     },
   },
   {
     method: "DELETE",
     pattern: /^\/users\/([^/]+)$/,
     handler: async (m) => {
-      // edu_module'de silme yerine denetim geçmişini koruyan soft delete var.
-      await http.patch(`/admin/users/${m[1]}`, { active: false });
+      await http.delete(`/admin/users/${m[1]}`);
       return { ok: true };
     },
   },
   {
     method: "POST",
     pattern: /^\/users\/([^/]+)\/resend-activation$/,
-    // E-posta altyapısı yok; UI'deki mock davranış korunur.
-    handler: async () => ({ ok: true }),
+    handler: async (m) => {
+      const res = await http.post(`/admin/users/${m[1]}/resend-activation`);
+      return res.data;
+    },
   },
 
   // --- Admin: gruplar ---

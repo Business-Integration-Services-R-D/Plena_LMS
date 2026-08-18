@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-route
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import AuthCallback from "@/pages/AuthCallback";
+import ActivatePage from "@/pages/ActivatePage";
 import LoginPage from "@/pages/LoginPage";
 import Layout from "@/components/Layout";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
@@ -51,6 +52,7 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/login" element={authBypass ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/activate" element={<ActivatePage />} />
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/dashboard" element={<HomeRedirect />} />
       <Route path="/admin" element={<Protected adminOnly><AdminDashboard /></Protected>} />

@@ -14,7 +14,8 @@ export default function UsersPage() {
   const [groups, setGroups] = useState([]);
   const [userModal, setUserModal] = useState(false);
   const [groupModal, setGroupModal] = useState(null); // null | {group or new}
-  const [form, setForm] = useState({ email: "", name: "", role: "employee", password: "" });
+  const [form, setForm] = useState({ email: "", name: "", role: "employee" });
+  const [userSubmitting, setUserSubmitting] = useState(false);
   const [groupForm, setGroupForm] = useState({ name: "", member_ids: [] });
 
   const load = useCallback(() => {
@@ -23,15 +24,22 @@ export default function UsersPage() {
   }, []);
   useEffect(load, [load]);
 
-  const createUser = async () => {
+  const createUser = async (sendActivation) => {
+    setUserSubmitting(true);
     try {
-      await api.post("/users", form);
-      toast.success("Kullanıcı oluşturuldu");
+      const response = await api.post("/users", { ...form, sendActivation });
+      if (sendActivation && response.data.activation_email_sent === false) {
+        toast.warning(response.data.activation_email_error || "Kullanıcı kaydedildi ancak aktivasyon maili gönderilemedi");
+      } else {
+        toast.success(sendActivation ? "Kullanıcı kaydedildi ve aktivasyon maili gönderildi" : "Kullanıcı kaydedildi");
+      }
       setUserModal(false);
-      setForm({ email: "", name: "", role: "employee", password: "" });
+      setForm({ email: "", name: "", role: "employee" });
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Kullanıcı oluşturulamadı");
+    } finally {
+      setUserSubmitting(false);
     }
   };
 
@@ -47,8 +55,17 @@ export default function UsersPage() {
   };
 
   const resend = async (u) => {
-    await api.post(`/users/${u.user_id}/resend-activation`);
-    toast.success("Aktivasyon maili tekrar gönderildi");
+    try {
+      await api.post(`/users/${u.user_id}/resend-activation`);
+      toast.success(
+        u.status === "invited"
+          ? "Aktivasyon maili tekrar gönderildi"
+          : "Aktivasyon maili gönderildi",
+      );
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Aktivasyon maili gönderilemedi");
+    }
   };
 
   const saveGroup = async () => {
@@ -137,15 +154,25 @@ export default function UsersPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${u.status === "active" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
-                      {u.status === "active" ? "Aktif" : "Davet Edildi"}
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                      u.status === "active"
+                        ? "bg-emerald-50 text-emerald-600"
+                        : u.status === "invited"
+                          ? "bg-amber-50 text-amber-600"
+                          : "bg-slate-100 text-slate-600"
+                    }`}>
+                      {u.status === "active"
+                        ? "Aktif"
+                        : u.status === "invited"
+                          ? "Davet Edildi"
+                          : "Aktivasyon Gönderilmedi"}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-slate-400">{fmtDate(u.created_at)}</td>
                   <td className="px-6 py-4">
                     <div className="flex justify-end gap-1">
                       {u.status !== "active" && (
-                        <button data-testid={`resend-activation-${u.email}`} onClick={() => resend(u)} title="Aktivasyonu tekrar gönder"
+                        <button data-testid={`resend-activation-${u.email}`} onClick={() => resend(u)} title={u.status === "invited" ? "Aktivasyonu tekrar gönder" : "Aktivasyon gönder"}
                           className="p-2 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors">
                           <Mail className="w-4 h-4" />
                         </button>
@@ -195,15 +222,29 @@ export default function UsersPage() {
           <DialogHeader><DialogTitle>Yeni Kullanıcı</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <input data-testid="user-name-input" className={inputCls} placeholder="Ad Soyad" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <input data-testid="user-email-input" className={inputCls} placeholder="E-posta" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-            <input data-testid="user-password-input" type="password" className={inputCls} placeholder="Şifre (en az 6 karakter)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            <input data-testid="user-email-input" type="email" className={inputCls} placeholder="E-posta" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             <select data-testid="user-role-select" className={inputCls} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
               <option value="employee">Çalışan</option>
               <option value="admin">Yönetici</option>
             </select>
-            <button data-testid="user-save-btn" className={btnPrimary + " w-full"} disabled={!form.email || !form.name || form.password.length < 6} onClick={createUser}>
-              Oluştur
-            </button>
+            <div className="space-y-2 pt-1">
+              <button
+                data-testid="user-save-btn"
+                className="w-full px-5 py-2.5 rounded-full bg-white border border-navy-900/15 text-navy-900 text-sm font-medium hover:bg-slate-50 active:scale-[0.98] transition-[background-color,transform] disabled:opacity-40"
+                disabled={!form.email || !form.name || userSubmitting}
+                onClick={() => createUser(false)}
+              >
+                {userSubmitting ? "Kaydediliyor..." : "Kullanıcıyı Kaydet"}
+              </button>
+              <button
+                data-testid="user-save-and-send-activation-btn"
+                className={btnPrimary + " w-full"}
+                disabled={!form.email || !form.name || userSubmitting}
+                onClick={() => createUser(true)}
+              >
+                {userSubmitting ? "Gönderiliyor..." : "Kaydet ve Aktivasyon Maili Gönder"}
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -214,7 +255,7 @@ export default function UsersPage() {
           <div className="space-y-4 mt-2">
             <input data-testid="group-name-input" className={inputCls} placeholder="Grup adı" value={groupForm.name} onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })} />
             <div className="max-h-56 overflow-y-auto border border-navy-900/5 rounded-xl divide-y divide-navy-900/5">
-              {users.filter((u) => u.role === "employee").map((u) => (
+              {users.filter((u) => u.role === "employee" && u.status === "active").map((u) => (
                 <label key={u.user_id} className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50">
                   <input type="checkbox" data-testid={`group-member-${u.email}`} checked={groupForm.member_ids.includes(u.user_id)} onChange={() => toggleMember(u.user_id)} className="accent-navy-900" />
                   <span className="text-sm text-slate-700">{u.name}</span>

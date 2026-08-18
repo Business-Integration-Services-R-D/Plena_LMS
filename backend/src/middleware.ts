@@ -55,6 +55,7 @@ async function handle(req: NextRequest, pathname: string, isApi: boolean) {
   const isProtectedApi =
     isApi &&
     !pathname.startsWith("/api/auth/login") &&
+    !pathname.startsWith("/api/auth/activate") &&
     !pathname.startsWith("/api/health");
 
   if (!isAdmin && !isUserArea && !isProtectedApi) {
