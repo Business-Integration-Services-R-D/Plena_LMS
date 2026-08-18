@@ -98,7 +98,7 @@ const NotificationBell = ({ variant = "desktop" }) => {
   };
 
   return (
-    <div ref={ref} className={`relative ${isMobile ? "" : "translate-x-10 translate-y-2"}`}>
+    <div ref={ref} className={`relative z-50 ${isMobile ? "" : "translate-x-10 translate-y-2"}`}>
       <button
         data-testid={`notification-bell-${variant}`}
         onClick={toggleDropdown}
