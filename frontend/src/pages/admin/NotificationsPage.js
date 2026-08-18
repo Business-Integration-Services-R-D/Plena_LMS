@@ -21,7 +21,7 @@ export default function NotificationsPage() {
       <PageHeader
         overline="İletişim"
         title="Bildirimler"
-        subtitle="Gönderilen e-postaların kaydı. (Şu an mock — gerçek e-posta entegrasyonu sonradan eklenecek.)"
+        subtitle="Gönderilen e-postaların kaydı."
       />
       <div className="space-y-3 max-w-3xl">
         {emails.length === 0 && <p className="text-sm text-slate-400">Henüz bildirim gönderilmedi.</p>}
