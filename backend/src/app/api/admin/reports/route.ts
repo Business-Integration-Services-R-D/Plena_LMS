@@ -131,6 +131,7 @@ export async function GET(req: NextRequest) {
       assignedAt: e.assignedAt,
       startsAt: e.startsAt,
       dueAt: e.dueAt,
+      reminderDays: e.reminderDays,
       firstStartedAt: e.firstStartedAt,
       completedAt: e.completedAt,
       totalWatchedSec: e.totalWatchedSec,

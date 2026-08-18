@@ -387,6 +387,43 @@ const routes = [
       return toUiUser(res.data);
     },
   },
+  {
+    method: "GET",
+    pattern: /^\/notifications$/,
+    handler: async () => {
+      const res = await http.get("/user/notifications");
+      return {
+        items: res.data.items.map((item) => ({
+          id: item.id,
+          type: item.kind.toLowerCase(),
+          title: item.title,
+          text: item.body,
+          link: item.link,
+          metadata: item.metadata,
+          read: Boolean(item.readAt),
+          occurred_at: item.occurredAt,
+          created_at: item.createdAt,
+        })),
+        unread_count: res.data.unreadCount,
+      };
+    },
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/notifications\/([^/]+)\/read$/,
+    handler: async (m) => {
+      const res = await http.patch(`/user/notifications/${m[1]}/read`);
+      return res.data;
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/notifications\/read-all$/,
+    handler: async () => {
+      const res = await http.post("/user/notifications/read-all");
+      return res.data;
+    },
+  },
   // --- Admin: kullanıcılar ---
   {
     method: "GET",
@@ -651,7 +688,7 @@ const routes = [
         status: toUiStatus(r.status, r.videoCompleted),
         start_at: r.startsAt,
         due_at: r.dueAt,
-        reminder_days: 0, // e-posta hatırlatma altyapısı yok
+        reminder_days: r.reminderDays || 0,
       }));
     },
   },
@@ -669,6 +706,7 @@ const routes = [
           userId,
           startsAt,
           dueAt,
+          reminderDays: Number(body.reminder_days) || 0,
         });
         created += 1;
       }
@@ -679,6 +717,7 @@ const routes = [
           groupId,
           startsAt,
           dueAt,
+          reminderDays: Number(body.reminder_days) || 0,
         });
         created += res.data.enrolled ?? 1;
       }
@@ -1141,6 +1180,7 @@ export const api = {
   get: (url, config) => dispatch("GET", url, undefined, config),
   post: (url, body, config) => dispatch("POST", url, body, config),
   put: (url, body, config) => dispatch("PUT", url, body, config),
+  patch: (url, body, config) => dispatch("PATCH", url, body, config),
   delete: (url, config) => dispatch("DELETE", url, undefined, config),
 };
 

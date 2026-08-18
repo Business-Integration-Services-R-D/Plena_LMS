@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { NavLink, Link, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import {
@@ -20,29 +20,39 @@ const adminNav2 = [{ to: "/admin/reports", label: "Raporlar", icon: BarChart3 }]
 
 const employeeNav = [{ to: "/trainings", label: "Eğitimlerim", icon: BookOpen }];
 
-// Çalışan bildirimleri şimdilik sahte (statik) veridir — henüz gerçek bir
-// bildirim altyapısına/backend'e bağlanmıyor, yalnızca sunum/demo amaçlı
-// örnek içerik gösterir.
-const FAKE_EMPLOYEE_NOTIFICATIONS = [
-  { id: "fake-1", title: "Yeni eğitim atandı", text: "Denizde Can Güvenliği Eğitimi", when: "2 saat önce" },
-  { id: "fake-2", title: "Son tarihe 3 gün kaldı", text: "Yangınla Mücadele ve Önleme Eğitimi", when: "Dün" },
-  { id: "fake-3", title: "Sınav hatırlatması", text: "ISM Kod Farkındalık Eğitimi — video tamamlandı, sınav bekliyor", when: "3 gün önce" },
-];
+const relativeTime = (iso) => {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
+  if (seconds < 60) return "Şimdi";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} dk önce`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} sa önce`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? "Dün" : `${days} gün önce`;
+};
 
-// Bildirim zili — sağ üstte ikon olarak; bildirimler sayfasına giden
-// hızlı önizleme. Masaüstünde yüzen bir buton, mobilde üst çubuğa gömülü.
-// Yönetici: gönderilen e-posta kaydı. Çalışan: şimdilik sahte örnek veri.
-const NotificationBell = ({ variant = "desktop", isAdmin }) => {
+// Kullanıcıya özel kalıcı bildirimlerin hızlı önizlemesi.
+const NotificationBell = ({ variant = "desktop" }) => {
   const navigate = useNavigate();
   const ref = useRef(null);
   const [open, setOpen] = useState(false);
-  const [emailItems, setEmailItems] = useState([]);
+  const [items, setItems] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const loadNotifications = useCallback(() => {
+    api.get("/notifications")
+      .then((response) => {
+        setItems(response.data.items);
+        setUnreadCount(response.data.unread_count);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
-    if (isAdmin) {
-      api.get("/emails").then((r) => setEmailItems(r.data)).catch(() => {});
-    }
-  }, [isAdmin]);
+    loadNotifications();
+    const timer = window.setInterval(loadNotifications, 60_000);
+    return () => window.clearInterval(timer);
+  }, [loadNotifications]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -53,75 +63,94 @@ const NotificationBell = ({ variant = "desktop", isAdmin }) => {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, [open]);
 
-  const list = isAdmin ? emailItems : FAKE_EMPLOYEE_NOTIFICATIONS;
-  const recent = list.slice(0, 5);
-  const count = list.length;
+  const recent = items.slice(0, 5);
   const isMobile = variant === "mobile";
 
-  const goToItem = () => {
+  const toggleDropdown = () => {
+    setOpen((current) => {
+      if (!current) loadNotifications();
+      return !current;
+    });
+  };
+
+  const goToItem = async (item) => {
+    if (!item.read) {
+      setItems((current) =>
+        current.map((entry) =>
+          entry.id === item.id ? { ...entry, read: true } : entry,
+        ),
+      );
+      setUnreadCount((current) => Math.max(0, current - 1));
+      api.patch(`/notifications/${item.id}/read`).catch(loadNotifications);
+    }
     setOpen(false);
-    navigate(isAdmin ? "/admin/notifications" : "/trainings");
+    navigate(item.link || "/trainings");
+  };
+
+  const markAllRead = async () => {
+    setItems((current) => current.map((item) => ({ ...item, read: true })));
+    setUnreadCount(0);
+    try {
+      await api.post("/notifications/read-all");
+    } catch {
+      loadNotifications();
+    }
   };
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className={`relative ${isMobile ? "" : "translate-x-10 translate-y-2"}`}>
       <button
         data-testid={`notification-bell-${variant}`}
-        onClick={() => setOpen((o) => !o)}
+        onClick={toggleDropdown}
         aria-label="Bildirimler"
         className={
           isMobile
-            ? "relative p-2 rounded-lg text-white hover:bg-white/[0.08] transition-colors"
+            ? "relative translate-y-1 p-2 rounded-lg text-white hover:bg-white/[0.08] transition-colors"
             : "relative w-10 h-10 rounded-full bg-white shadow-[0_8px_24px_-10px_rgba(14,32,51,0.35)] border border-navy-900/[0.06] flex items-center justify-center text-navy-700 hover:text-brand-600 transition-colors"
         }
       >
         <Bell className="w-5 h-5" strokeWidth={1.8} />
-        {count > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-cyan-500 text-white text-[10px] font-semibold flex items-center justify-center">
-            {count > 9 ? "9+" : count}
+        {unreadCount > 0 && (
+          <span data-testid="notification-unread-badge" className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-cyan-500 text-white text-[10px] font-semibold flex items-center justify-center">
+            {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
       </button>
       {open && (
         <div
-          className={`absolute ${isMobile ? "right-0 top-11" : "right-0 top-12"} w-80 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-[0_24px_60px_-20px_rgba(14,32,51,0.35)] border border-navy-900/[0.06] overflow-hidden z-40`}
+          className={`absolute ${isMobile ? "right-0 top-11" : "right-0 top-12"} w-[26rem] max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-[0_24px_60px_-20px_rgba(14,32,51,0.35)] border border-navy-900/[0.06] overflow-hidden z-40`}
           data-testid="notification-dropdown"
         >
-          <div className="flex items-center justify-between px-4 py-3 border-b n-hairline">
-            <p className="text-sm font-semibold text-navy-950">Bildirimler</p>
-            {isAdmin && (
-              <Link to="/admin/notifications" onClick={() => setOpen(false)} className="text-xs text-brand-600 font-medium hover:underline">
-                Tümünü gör
-              </Link>
+          <div className="flex items-center justify-between gap-4 px-5 py-4 border-b n-hairline">
+            <div>
+              <p className="text-base font-semibold text-navy-950">Bildirimler</p>
+              <p className="text-xs text-slate-400 mt-0.5">{unreadCount > 0 ? `${unreadCount} okunmamış bildirim` : "Tüm bildirimler okundu"}</p>
+            </div>
+            {unreadCount > 0 && (
+              <button data-testid="notification-mark-all-read" onClick={markAllRead} className="text-xs text-brand-600 font-medium hover:underline shrink-0">
+                Tümünü okundu yap
+              </button>
             )}
           </div>
-          <div className="max-h-80 overflow-y-auto divide-y divide-navy-900/5">
-            {recent.length === 0 && <p className="px-4 py-6 text-sm text-slate-400 text-center">Henüz bildirim yok.</p>}
-            {isAdmin
-              ? recent.map((m) => (
-                  <button
-                    key={m.email_id}
-                    onClick={goToItem}
-                    className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
-                  >
-                    <p className="text-[11px] text-slate-400 mb-0.5">{new Date(m.created_at).toLocaleString("tr-TR")}</p>
-                    <p className="text-sm font-medium text-navy-950 truncate">{m.subject}</p>
-                    <p className="text-xs text-slate-500 truncate">→ {m.to}</p>
-                  </button>
-                ))
-              : recent.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={goToItem}
-                    className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <p className="text-[11px] text-brand-600 font-medium">{item.title}</p>
-                      <p className="text-[11px] text-slate-300 shrink-0">{item.when}</p>
-                    </div>
-                    <p className="text-sm font-medium text-navy-950 truncate">{item.text}</p>
-                  </button>
-                ))}
+          <div className="max-h-[28rem] overflow-y-auto divide-y divide-navy-900/5">
+            {recent.length === 0 && <p className="px-5 py-10 text-sm text-slate-400 text-center">Henüz bildirim yok.</p>}
+            {recent.map((item) => (
+              <button
+                key={item.id}
+                data-testid={`notification-item-${item.id}`}
+                onClick={() => goToItem(item)}
+                className={`w-full text-left px-5 py-4 hover:bg-slate-50 transition-colors ${item.read ? "bg-white" : "bg-brand-50/50"}`}
+              >
+                <div className="flex items-start justify-between gap-4 mb-1.5">
+                  <p className={`text-sm leading-snug ${item.read ? "font-medium text-slate-600" : "font-semibold text-brand-700"}`}>{item.title}</p>
+                  <p className="text-xs text-slate-400 shrink-0 pt-0.5">{relativeTime(item.occurred_at)}</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  {!item.read && <span className="w-2 h-2 rounded-full bg-cyan-500 shrink-0 mt-1.5" aria-label="Okunmamış" />}
+                  <p className={`text-sm leading-relaxed text-navy-950 line-clamp-3 ${item.read ? "font-normal" : "font-medium"}`}>{item.text}</p>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       )}

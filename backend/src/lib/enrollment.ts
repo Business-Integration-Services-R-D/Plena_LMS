@@ -44,6 +44,7 @@ export async function syncEnrollmentsForAssignment(assignmentId: string) {
         assignmentId: assignment.id,
         startsAt: assignment.startsAt,
         dueAt: assignment.dueAt,
+        reminderDays: assignment.reminderDays,
         assignedAt: assignment.assignedAt,
       },
       create: {
@@ -52,6 +53,7 @@ export async function syncEnrollmentsForAssignment(assignmentId: string) {
         assignmentId: assignment.id,
         startsAt: assignment.startsAt,
         dueAt: assignment.dueAt,
+        reminderDays: assignment.reminderDays,
         assignedAt: assignment.assignedAt,
         status: EnrollmentStatus.NOT_STARTED,
       },
@@ -77,6 +79,7 @@ export async function syncEnrollmentsForGroupMember(
         assignmentId: assignment.id,
         startsAt: assignment.startsAt,
         dueAt: assignment.dueAt,
+        reminderDays: assignment.reminderDays,
       },
       create: {
         userId,
@@ -84,6 +87,7 @@ export async function syncEnrollmentsForGroupMember(
         assignmentId: assignment.id,
         startsAt: assignment.startsAt,
         dueAt: assignment.dueAt,
+        reminderDays: assignment.reminderDays,
         assignedAt: assignment.assignedAt,
         status: EnrollmentStatus.NOT_STARTED,
       },

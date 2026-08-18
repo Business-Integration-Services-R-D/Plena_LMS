@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { AuditAction } from "@prisma/client";
+import { AuditAction, NotificationKind } from "@prisma/client";
 import { z } from "zod";
 import {
   ACTIVATION_MAX_ATTEMPTS,
@@ -162,6 +162,26 @@ export async function POST(req: NextRequest) {
           name: true,
           role: true,
           active: true,
+        },
+      });
+
+      await tx.userNotification.upsert({
+        where: {
+          userId_dedupeKey: {
+            userId: user.id,
+            dedupeKey: "welcome",
+          },
+        },
+        update: {},
+        create: {
+          userId: user.id,
+          kind: NotificationKind.WELCOME,
+          dedupeKey: "welcome",
+          title: "Plena LMS'e hoş geldiniz",
+          body:
+            "Hesabınız başarıyla aktive edildi. Size atanan eğitimleri Eğitimlerim ekranından takip edebilirsiniz.",
+          link: "/trainings",
+          occurredAt: now,
         },
       });
 

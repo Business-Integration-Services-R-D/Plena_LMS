@@ -94,6 +94,12 @@ enum AuditAction {
   USER_ACTIVATED_ACCOUNT
 }
 
+enum NotificationKind {
+  WELCOME
+  TRAINING_STARTED
+  DUE_REMINDER
+}
+
 // ---------------------------------------------------------------------------
 // 1) Kullanıcılar
 // ---------------------------------------------------------------------------
@@ -117,6 +123,7 @@ model User {
   quizAttempts     QuizAttempt[]
   auditLogs        AuditLog[]
   activationTokens UserActivationToken[]
+  notifications    UserNotification[]
 
   @@index([active])
   @@index([deletedAt])
@@ -136,6 +143,25 @@ model UserActivationToken {
 
   @@index([userId, createdAt])
   @@index([expiresAt])
+}
+
+model UserNotification {
+  id         String           @id @default(cuid())
+  userId     String
+  kind       NotificationKind
+  dedupeKey  String
+  title      String
+  body       String
+  link       String?
+  metadata   Json?
+  readAt     DateTime?
+  occurredAt DateTime         @default(now())
+  createdAt  DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt, occurredAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -350,6 +376,8 @@ model Assignment {
   startsAt     DateTime
   /// Son tamamlama tarihi/saati. Geçilirse durum OVERDUE olur.
   dueAt        DateTime?
+  /// Son N takvim gününde günlük uygulama içi hatırlatma. 0 = kapalı.
+  reminderDays Int       @default(0)
   assignedAt   DateTime  @default(now())
   assignedById String?
 
@@ -381,6 +409,7 @@ model Enrollment {
   /// Atamadan kopyalanan görünürlük penceresi.
   startsAt     DateTime
   dueAt        DateTime?
+  reminderDays Int       @default(0)
   assignedAt   DateTime  @default(now())
 
   /// 8) Kaldığı yerden devam için oynatıcı durumu.
