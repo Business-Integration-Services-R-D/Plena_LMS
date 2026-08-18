@@ -204,7 +204,7 @@ export default function ReportsPage() {
           <DialogHeader><DialogTitle>Denetim Kaydı — {detail?.user?.name}</DialogTitle></DialogHeader>
           {detail && (
             <div className="space-y-6 mt-2">
-              <div className="grid grid-cols-3 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 <div className="bg-[#F5F8FA] border n-hairline rounded-xl p-4">
                   <p className="text-xs text-slate-400 mb-1">İzleme Süresi</p>
                   <p className="font-medium text-navy-950">{fmtTime(detail.progress?.watched_seconds || 0)}</p>

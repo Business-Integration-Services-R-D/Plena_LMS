@@ -35,7 +35,7 @@ export default function AssignmentsPage() {
         reminder_days: Number(form.reminder_days) || 0,
       };
       const res = await api.post("/assignments", payload);
-      toast.success(`${res.data.created} atama oluşturuldu, bilgilendirme mailleri gönderildi (mock)`);
+      toast.success(`${res.data.created} atama oluşturuldu, bilgilendirme mailleri gönderildi`);
       setModal(false);
       setForm({ training_id: "", user_ids: [], group_ids: [], start_at: "", due_at: "", reminder_days: 0 });
       load();
@@ -63,8 +63,8 @@ export default function AssignmentsPage() {
           </button>
         }
       />
-      <div className="n-card n-card-brand overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="n-card n-card-brand overflow-x-auto">
+        <table className="w-full text-sm min-w-[860px]">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b n-hairline bg-[#F5F8FA]">
               <th className="px-6 py-4 font-medium">Kullanıcı</th>
@@ -138,7 +138,7 @@ export default function AssignmentsPage() {
                 </div>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <p className="text-xs text-slate-400 mb-1.5">Başlangıç (boş = hemen)</p>
                 <input data-testid="assignment-start-input" type="datetime-local" className={inputCls} value={form.start_at} onChange={(e) => setForm({ ...form, start_at: e.target.value })} />
