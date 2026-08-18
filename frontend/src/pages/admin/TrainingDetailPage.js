@@ -316,14 +316,14 @@ export default function TrainingDetailPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between mt-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap mt-4">
                 <p className="text-sm text-slate-400">Süre: {fmtTime(training.duration)} · {(training.video_size / 1024 / 1024).toFixed(1)} MB</p>
                 <button data-testid="replace-video-btn" onClick={() => fileRef.current?.click()} className="text-sm text-brand-600 font-medium hover:underline">Videoyu değiştir</button>
               </div>
 
               {/* Duraklatılan ana kontrol noktası ekleme */}
               {previewPaused && !cpPanelOpen && (
-                <div className="flex items-center justify-between mt-3 px-4 py-3 rounded-xl bg-[#F5F8FA] border n-hairline fade-up">
+                <div className="flex items-center justify-between gap-3 flex-wrap mt-3 px-4 py-3 rounded-xl bg-[#F5F8FA] border n-hairline fade-up">
                   <span className="flex items-center gap-1.5 text-sm text-slate-600 tabular-nums">
                     <Clock className="w-3.5 h-3.5 text-brand-600" /> Seçilen an: <span className="font-medium text-navy-950">{fmtTime(Math.floor(previewTime))}</span>
                   </span>
@@ -341,7 +341,7 @@ export default function TrainingDetailPage() {
                     </p>
                     <button data-testid="cp-preview-cancel-btn" onClick={() => setCpPanelOpen(false)} className="text-sm text-slate-400 hover:text-slate-700 transition-colors">Vazgeç</button>
                   </div>
-                  <div className="flex items-center gap-5">
+                  <div className="flex items-center gap-5 flex-wrap">
                     <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
                       <input
                         data-testid="cp-source-new"
@@ -394,7 +394,7 @@ export default function TrainingDetailPage() {
                       </div>
                     )
                   )}
-                  <div className="flex items-center gap-5">
+                  <div className="flex items-center gap-5 flex-wrap">
                     <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer select-none">
                       <input
                         data-testid="cp-preview-no-timeout"
@@ -505,7 +505,7 @@ export default function TrainingDetailPage() {
           <div className="space-y-3 mb-6">
             {(training.checkpoints || []).length === 0 && <p className="text-sm text-slate-400">Henüz kontrol noktası yok.</p>}
             {(training.checkpoints || []).map((cp) => (
-              <div key={cp.id} className="flex items-center gap-4 px-4 py-3 rounded-xl bg-[#F5F8FA] border n-hairline" data-testid={`checkpoint-item-${cp.id}`}>
+              <div key={cp.id} className="flex items-center gap-4 px-4 py-3 rounded-xl bg-[#F5F8FA] border n-hairline flex-wrap" data-testid={`checkpoint-item-${cp.id}`}>
                 <span className="flex items-center gap-1.5 text-sm font-medium text-navy-950 tabular-nums"><Clock className="w-3.5 h-3.5 text-brand-600" />{fmtTime(cp.time)}</span>
                 <p className="flex-1 text-sm text-slate-600 truncate">{qById[cp.question_id]?.text || "Soru silinmiş"}</p>
                 <span className="text-xs text-slate-400 whitespace-nowrap">
@@ -537,7 +537,7 @@ export default function TrainingDetailPage() {
                 {quizDirty && <span className="text-amber-500"> · Kaydedilmemiş değişiklik var</span>}
               </p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-500 whitespace-nowrap">Puanlama:</span>
                 <select

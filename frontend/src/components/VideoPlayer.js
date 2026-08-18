@@ -249,7 +249,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
       />
 
       {/* controls */}
-      <div className="absolute bottom-0 inset-x-0 bg-black/50 backdrop-blur-xl px-5 py-4">
+      <div className="absolute bottom-0 inset-x-0 bg-black/50 backdrop-blur-xl px-3 py-3 sm:px-5 sm:py-4">
         <div className="relative h-2 rounded-full bg-white/20 cursor-pointer mb-3 group" onClick={handleBarClick} data-testid="video-progress-bar">
           <div className="absolute inset-y-0 left-0 rounded-full bg-white/35" style={{ width: `${dur ? Math.min(100, (maxPos / dur) * 100) : 0}%` }} />
           <div className="absolute inset-y-0 left-0 rounded-full bg-brand-400" style={{ width: `${dur ? Math.min(100, (current / dur) * 100) : 0}%` }} />
@@ -262,21 +262,21 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
             />
           ))}
         </div>
-        <div className="flex items-center gap-4">
-          <button data-testid="video-play-btn" onClick={togglePlay} className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform">
+        <div className="flex items-center gap-2 sm:gap-4">
+          <button data-testid="video-play-btn" onClick={togglePlay} className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shrink-0">
             {playing ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
           </button>
-          <span className="text-sm text-white/90 tabular-nums" data-testid="video-time">{fmtTime(current)} / {fmtTime(dur)}</span>
-          <div className="ml-auto flex items-center gap-3">
+          <span className="text-xs sm:text-sm text-white/90 tabular-nums shrink-0" data-testid="video-time">{fmtTime(current)} / {fmtTime(dur)}</span>
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
             {seekBlocked && (
-              <span className="flex items-center gap-1.5 text-xs text-amber-300 bg-amber-500/20 px-3 py-1.5 rounded-full" data-testid="seek-blocked-warning">
+              <span className="hidden sm:flex items-center gap-1.5 text-xs text-amber-300 bg-amber-500/20 px-3 py-1.5 rounded-full" data-testid="seek-blocked-warning">
                 <Lock className="w-3 h-3" /> İleri sarma kapalı
               </span>
             )}
             <button
               data-testid="video-mute-btn"
               onClick={toggleMute}
-              className="text-white/70 hover:text-white transition-colors"
+              className="text-white/70 hover:text-white transition-colors shrink-0"
               aria-label={muted || volume === 0 ? "Sesi aç" : "Sesi kapat"}
             >
               {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
@@ -290,12 +290,12 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
               value={volume}
               onChange={handleVolumeChange}
               aria-label="Ses seviyesi"
-              className="w-20 h-1 accent-white cursor-pointer"
+              className="hidden sm:block w-20 h-1 accent-white cursor-pointer"
             />
             <button
               data-testid="video-fullscreen-btn"
               onClick={toggleFullscreen}
-              className="text-white/70 hover:text-white transition-colors"
+              className="text-white/70 hover:text-white transition-colors shrink-0"
               aria-label={isFullscreen ? "Tam ekrandan çık" : "Tam ekran"}
             >
               {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}

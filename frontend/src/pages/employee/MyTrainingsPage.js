@@ -42,10 +42,9 @@ export default function MyTrainingsPage() {
   };
 
   return (
-    <div className="fade-up max-w-6xl" data-testid="my-trainings-page">
+    <div className="fade-up" data-testid="my-trainings-page">
       <HeroBanner
         testId="trainings-welcome-banner"
-        dense
         overline="ÇALIŞAN PANELİ"
         title={`Hoş geldiniz, ${user?.name || ""}`}
         subtitle="Size atanan eğitimleri buradan tamamlayabilirsiniz."
@@ -77,7 +76,7 @@ export default function MyTrainingsPage() {
                     {done ? <CheckCircle2 className="w-5 h-5" /> : <PlayCircle className="w-5 h-5" />}
                   </div>
                   <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium backdrop-blur-sm ${done ? "bg-emerald-400/90 text-white" : a.status === "assigned" ? "bg-white/[0.14] text-white ring-1 ring-white/20" : "bg-cyan-400/90 text-navy-950"}`}>
-                    {done ? "Tamamlandı" : a.status === "assigned" ? "Başlamadı" : a.status === "video_completed" ? "Sınav Bekliyor" : "Devam Ediyor"}
+                    {done ? "Eğitim Tamamlandı" : a.status === "assigned" ? "Başlamadı" : a.status === "video_completed" ? "Sınav Bekliyor" : "Devam Ediyor"}
                   </span>
                 </div>
               </OceanBanner>

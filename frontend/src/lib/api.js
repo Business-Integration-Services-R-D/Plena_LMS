@@ -1144,8 +1144,8 @@ export const fmtDate = (iso) => {
 export const STATUS_TR = {
   assigned: "Atandı",
   in_progress: "Devam Ediyor",
-  video_completed: "Video Bitti",
-  completed: "Tamamlandı",
+  video_completed: "Video Tamamlandı",
+  completed: "Eğitim Tamamlandı",
 };
 
 export const STATUS_COLOR = {

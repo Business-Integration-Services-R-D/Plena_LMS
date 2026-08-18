@@ -48,7 +48,7 @@ export default function UsersPage() {
 
   const resend = async (u) => {
     await api.post(`/users/${u.user_id}/resend-activation`);
-    toast.success("Aktivasyon maili tekrar gönderildi (mock)");
+    toast.success("Aktivasyon maili tekrar gönderildi");
   };
 
   const saveGroup = async () => {
@@ -113,8 +113,8 @@ export default function UsersPage() {
       </div>
 
       {tab === "users" && (
-        <div className="n-card n-card-brand overflow-hidden">
-          <table className="w-full text-sm">
+        <div className="n-card n-card-brand overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b n-hairline bg-[#F5F8FA]">
                 <th className="px-6 py-4 font-medium">Kullanıcı</th>
