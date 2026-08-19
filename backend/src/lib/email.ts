@@ -113,7 +113,7 @@ export async function sendActivationEmail(input: ActivationEmailInput) {
     body: JSON.stringify({
       from:
         process.env.EMAIL_FROM ||
-        "Plena LMS <noreply@plenalms.bislabs.tech>",
+        "Plena LMS <noreply@bislabs.tech>",
       to: [input.to],
       subject: "Plena LMS - Hesabınızı Aktive Edin",
       html: activationHtml(input),

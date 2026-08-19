@@ -15,7 +15,7 @@ services:
       APP_URL: https://${APP_DOMAIN}
       APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Istanbul}
       RESEND_API_KEY: ${RESEND_API_KEY}
-      EMAIL_FROM: ${EMAIL_FROM:-Plena LMS <noreply@plenalms.bislabs.tech>}
+      EMAIL_FROM: ${EMAIL_FROM:-Plena LMS <noreply@bislabs.tech>}
       SEED_ON_START: ${SEED_ON_START:-false}
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health || exit 1"]

@@ -276,21 +276,126 @@ const buildReportPdf = async (courseTitle, rows) => {
     pdfMake.vfs = fonts.pdfMake?.vfs || fonts.vfs || fonts;
   }
 
-  const header = ["Kullanıcı", "E-posta", "Durum", "İzleme", "İzleme Süresi", "Kontrol N.", "KN Hatası", "Sınav", "Tamamlanma"];
+  const formatDateTime = (value) => {
+    if (!value) return "-";
+    const parts = new Intl.DateTimeFormat("tr-TR", {
+      timeZone: "Europe/Istanbul",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(new Date(value));
+    const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${byType.day}.${byType.month}.${byType.year}\n${byType.hour}:${byType.minute}`;
+  };
+  const statusStyle = {
+    completed: { label: "Tamamlandı", color: "#047857", fill: "#D1FAE5" },
+    video_completed: { label: "İçerik tamamlandı", color: "#B45309", fill: "#FEF3C7" },
+    in_progress: { label: "Devam ediyor", color: "#0369A1", fill: "#E0F2FE" },
+    assigned: { label: "Başlamadı", color: "#475569", fill: "#F1F5F9" },
+  };
+  const statuses = rows.map((row) => toUiStatus(row.status, row.videoCompleted));
+  const completedCount = statuses.filter((status) => status === "completed").length;
+  const inProgressCount = statuses.filter(
+    (status) => status === "in_progress" || status === "video_completed",
+  ).length;
+  const notStartedCount = statuses.filter((status) => status === "assigned").length;
+  const averageProgress =
+    rows.length > 0
+      ? Math.round(
+          rows.reduce((sum, row) => sum + Number(row.watchedPercent || 0), 0) /
+            rows.length,
+        )
+      : 0;
+  const totalWatched = rows.reduce(
+    (sum, row) => sum + Number(row.totalWatchedSec || 0),
+    0,
+  );
+  const generatedAt = new Intl.DateTimeFormat("tr-TR", {
+    timeZone: "Europe/Istanbul",
+    dateStyle: "long",
+    timeStyle: "medium",
+  }).format(new Date());
+
+  const header = [
+    "Kullanıcı",
+    "E-posta",
+    "Durum",
+    "İlerleme",
+    "İçerikte Geçen Süre",
+    "Kontrol Noktaları",
+    "Sınav Sonucu",
+    "Atama Tarihi",
+    "Son Tarih",
+    "Tamamlanma",
+  ];
   const body = [
-    header.map((h) => ({ text: h, bold: true, fontSize: 9, color: "#555555" })),
-    ...rows.map((r) => {
+    header.map((text) => ({
+      text,
+      bold: true,
+      fontSize: 8,
+      color: "#FFFFFF",
+      fillColor: "#0E2033",
+      margin: [0, 2, 0, 2],
+    })),
+    ...rows.map((r, rowIndex) => {
       const status = toUiStatus(r.status, r.videoCompleted);
+      const appearance = statusStyle[status] || {
+        label: STATUS_TR[status] || status,
+        color: "#475569",
+        fill: "#F1F5F9",
+      };
+      const rowFill = rowIndex % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+      const common = { fontSize: 8, color: "#334155", fillColor: rowFill };
+      const checkpointFails = Number(r.checkpointFails || 0);
+      const examDetail =
+        r.bestScorePercent != null
+          ? [
+              `%${Math.round(r.bestScorePercent)}`,
+              r.correctCount != null || r.wrongCount != null
+                ? `${r.correctCount || 0} doğru · ${r.wrongCount || 0} yanlış`
+                : null,
+              r.attemptCount ? `${r.attemptCount} deneme` : null,
+            ]
+              .filter(Boolean)
+              .join("\n")
+          : "Sınava girilmedi";
       return [
-        { text: r.user?.name || "-", fontSize: 9 },
-        { text: r.user?.email || "-", fontSize: 9 },
-        { text: STATUS_TR[status] || status, fontSize: 9 },
-        { text: `%${Math.round(r.watchedPercent || 0)}`, fontSize: 9 },
-        { text: fmtTime(r.totalWatchedSec || 0), fontSize: 9 },
-        { text: `${r.checkpointsPassed || 0}/${r.checkpointsTotal || 0}`, fontSize: 9 },
-        { text: String(r.checkpointFails || 0), fontSize: 9, color: (r.checkpointFails || 0) > 0 ? "#dc2626" : "#999999" },
-        { text: r.bestScorePercent != null ? `%${Math.round(r.bestScorePercent)}` : "-", fontSize: 9 },
-        { text: fmtDate(r.completedAt), fontSize: 9 },
+        { ...common, text: r.user?.name || "-", bold: true, color: "#0E2033" },
+        { ...common, text: r.user?.email || "-", fontSize: 7.5 },
+        {
+          text: appearance.label,
+          bold: true,
+          fontSize: 7.5,
+          color: appearance.color,
+          fillColor: appearance.fill,
+          alignment: "center",
+        },
+        {
+          ...common,
+          text: `%${Math.round(r.watchedPercent || 0)}`,
+          bold: true,
+          color: Number(r.watchedPercent || 0) >= 100 ? "#047857" : "#0369A1",
+          alignment: "center",
+        },
+        { ...common, text: fmtTime(r.totalWatchedSec || 0), alignment: "center" },
+        {
+          ...common,
+          text: `${r.checkpointsPassed || 0}/${r.checkpointsTotal || 0}${checkpointFails ? `\n${checkpointFails} hata` : ""}`,
+          color: checkpointFails ? "#B91C1C" : "#334155",
+          alignment: "center",
+        },
+        { ...common, text: examDetail, alignment: "center", fontSize: 7.5 },
+        { ...common, text: formatDateTime(r.assignedAt), alignment: "center" },
+        {
+          ...common,
+          text: formatDateTime(r.dueAt),
+          alignment: "center",
+          color: r.status === "OVERDUE" ? "#B91C1C" : "#334155",
+        },
+        { ...common, text: formatDateTime(r.completedAt), alignment: "center" },
       ];
     }),
   ];
@@ -298,35 +403,111 @@ const buildReportPdf = async (courseTitle, rows) => {
   const docDefinition = {
     pageSize: "A4",
     pageOrientation: "landscape",
-    pageMargins: [32, 36, 32, 36],
+    pageMargins: [30, 58, 30, 38],
+    info: {
+      title: `${courseTitle} - Eğitim Detay Raporu`,
+      author: "Martı Denizcilik · Plena LMS",
+      subject: "Eğitim ilerleme ve sınav sonuçları",
+    },
+    header: {
+      margin: [30, 18, 30, 0],
+      columns: [
+        {
+          text: "MARTI DENİZCİLİK",
+          fontSize: 10,
+          bold: true,
+          color: "#0E2033",
+        },
+        {
+          text: "Powered by Plena LMS",
+          fontSize: 8,
+          color: "#0891B2",
+          alignment: "right",
+        },
+      ],
+    },
     content: [
-      { text: "Eğitim Detay Raporu", fontSize: 16, bold: true, margin: [0, 0, 0, 2] },
-      { text: courseTitle, fontSize: 11, color: "#666666", margin: [0, 0, 0, 2] },
       {
-        text: `Oluşturulma: ${new Date().toLocaleString("tr-TR")}`,
-        fontSize: 8,
-        color: "#999999",
-        margin: [0, 0, 0, 12],
+        text: "EĞİTİM DETAY RAPORU",
+        fontSize: 9,
+        bold: true,
+        color: "#0891B2",
+        characterSpacing: 1.5,
+        margin: [0, 0, 0, 4],
       },
       {
-        table: { headerRows: 1, widths: ["auto", "*", "auto", "auto", "auto", "auto", "auto", "auto", "auto"], body },
-        layout: {
-          hLineWidth: (i) => (i <= 1 ? 0.8 : 0.4),
-          vLineWidth: () => 0,
-          hLineColor: () => "#dddddd",
-          paddingTop: () => 6,
-          paddingBottom: () => 6,
-          paddingLeft: () => 6,
-          paddingRight: () => 6,
+        text: courseTitle,
+        fontSize: 19,
+        bold: true,
+        color: "#0E2033",
+        margin: [0, 0, 0, 3],
+      },
+      {
+        text: `Türkiye saatiyle oluşturuldu: ${generatedAt}`,
+        fontSize: 8,
+        color: "#64748B",
+        margin: [0, 0, 0, 14],
+      },
+      {
+        table: {
+          widths: ["*", "*", "*", "*", "*"],
+          body: [[
+            { text: [{ text: `${rows.length}\n`, fontSize: 18, bold: true, color: "#0E2033" }, { text: "Toplam Atama", fontSize: 8, color: "#64748B" }], margin: [8, 7, 8, 7] },
+            { text: [{ text: `${completedCount}\n`, fontSize: 18, bold: true, color: "#047857" }, { text: "Tamamlanan", fontSize: 8, color: "#64748B" }], margin: [8, 7, 8, 7] },
+            { text: [{ text: `${inProgressCount}\n`, fontSize: 18, bold: true, color: "#0369A1" }, { text: "Devam Eden", fontSize: 8, color: "#64748B" }], margin: [8, 7, 8, 7] },
+            { text: [{ text: `${notStartedCount}\n`, fontSize: 18, bold: true, color: "#475569" }, { text: "Başlamayan", fontSize: 8, color: "#64748B" }], margin: [8, 7, 8, 7] },
+            { text: [{ text: `%${averageProgress}\n`, fontSize: 18, bold: true, color: "#B45309" }, { text: `Ort. İlerleme · ${fmtTime(totalWatched)}`, fontSize: 8, color: "#64748B" }], margin: [8, 7, 8, 7] },
+          ]],
         },
+        layout: {
+          hLineColor: () => "#DCE5EA",
+          vLineColor: () => "#DCE5EA",
+          hLineWidth: () => 0.7,
+          vLineWidth: () => 0.7,
+        },
+        margin: [0, 0, 0, 16],
+      },
+      {
+        text: "KATILIMCI DETAYLARI",
+        fontSize: 9,
+        bold: true,
+        color: "#36566F",
+        characterSpacing: 1,
+        margin: [0, 0, 0, 7],
+      },
+      {
+        table: {
+          headerRows: 1,
+          dontBreakRows: true,
+          widths: [82, 112, 64, 43, 55, 50, 67, 67, 67, 67],
+          body,
+        },
+        layout: {
+          hLineWidth: (i) => (i <= 1 ? 0.8 : 0.35),
+          vLineWidth: () => 0.35,
+          hLineColor: () => "#DCE5EA",
+          vLineColor: () => "#E8EEF2",
+          paddingTop: () => 7,
+          paddingBottom: () => 7,
+          paddingLeft: () => 5,
+          paddingRight: () => 5,
+        },
+      },
+      {
+        text: "Not: Tarih ve saatler Europe/Istanbul (UTC+3) saat dilimindedir. İzleme süresi, sistemde kaydedilen toplam içerik etkileşim süresini gösterir.",
+        fontSize: 7,
+        color: "#64748B",
+        margin: [0, 10, 0, 0],
       },
     ],
     footer: (page, total) => ({
-      text: `${page} / ${total}`,
-      alignment: "center",
-      fontSize: 8,
-      color: "#999999",
+      margin: [30, 0, 30, 14],
+      columns: [
+        { text: "Martı Denizcilik · Gizli eğitim raporu", fontSize: 7, color: "#94A3B8" },
+        { text: `Sayfa ${page} / ${total}`, alignment: "right", fontSize: 7, color: "#64748B" },
+      ],
     }),
+    defaultStyle: { font: "Roboto" },
   };
 
   const pdf = pdfMake.createPdf(docDefinition);
@@ -1219,7 +1400,7 @@ export const fmtDate = (iso) => {
 export const STATUS_TR = {
   assigned: "Atandı",
   in_progress: "Devam Ediyor",
-  video_completed: "Video Tamamlandı",
+  video_completed: "İçerik Tamamlandı",
   completed: "Eğitim Tamamlandı",
 };
 
