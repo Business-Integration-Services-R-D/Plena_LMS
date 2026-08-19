@@ -64,6 +64,8 @@ account already has the GitHub Actions OIDC provider, pass its ARN through
 
 The stack requires the production artifact bucket name and EC2 instance ID.
 Copy its `DeployRoleArn` output into the GitHub production environment.
+Update this stack after changes to `github-oidc.yml`; the current policy allows
+the runner to delete temporary mail-secret objects after deployment.
 
 ### GitHub production variables
 
@@ -76,8 +78,19 @@ Create a protected GitHub environment named `production`, restricted to the
 - `AWS_INSTANCE_ID`
 - `AWS_ARTIFACT_BUCKET`
 - `APP_URL`
+- `EMAIL_FROM` (for example `Plena LMS <noreply@bislabs.tech>`)
+
+Add this protected environment secret:
+
+- `RESEND_API_KEY`
 
 The existing `/opt/plena-lms/deploy/.env.production` file is migrated to
 `/opt/plena-lms/shared/.env.production` on the first automated deployment.
 Database credentials and the application secret remain on EC2 and never pass
 through GitHub Actions.
+
+During deployment, the Resend key is uploaded separately from the release
+archive to the private artifact bucket with S3 server-side encryption. The EC2
+deployment step writes only `RESEND_API_KEY` and `EMAIL_FROM` into the shared
+production environment, then deletes the temporary local and S3 copies. The
+secret is never embedded in the Git repository, release archive or SSM command.
