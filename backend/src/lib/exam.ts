@@ -89,7 +89,7 @@ function denied(reason: string): ExamGate {
 /**
  * Kullanıcı şu an teste girebilir mi?
  *
- * Sırasıyla: atama penceresi açık olmalı, video %100 izlenmiş olmalı ve
+ * Sırasıyla: atama penceresi açık olmalı, eğitim içeriği tamamlanmış olmalı ve
  * deneme hakkı kalmış olmalı. Testi zaten geçmiş kullanıcı deneme hakkından
  * bağımsız olarak sonucunu görmeye devam edebilir.
  */
@@ -102,7 +102,7 @@ export function checkExamGate(
   if (!window.open) return denied(window.reason);
 
   if (!enrollment.videoCompleted) {
-    return denied("Video %100 izlenmeden teste geçilemez");
+    return denied("Eğitim içeriği tamamlanmadan teste geçilemez");
   }
 
   const { maxAttempts } = settings;

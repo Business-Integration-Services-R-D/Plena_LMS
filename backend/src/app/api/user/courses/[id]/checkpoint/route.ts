@@ -53,6 +53,15 @@ export async function POST(
   if (!checkpoint || checkpoint.courseId !== courseId) {
     return NextResponse.json({ error: "Kontrol noktası bulunamadı" }, { status: 404 });
   }
+  if (
+    enrollment.course.video.pageCount &&
+    enrollment.maxReachedSec < checkpoint.timeSec
+  ) {
+    return NextResponse.json(
+      { error: "Bu kontrol noktasının bulunduğu sayfa henüz görüntülenmedi" },
+      { status: 403 },
+    );
+  }
 
   const isFreeText = checkpoint.question.type === QuestionType.FREE_TEXT;
   const textAnswer = parsed.data.textAnswer?.trim() || null;
@@ -135,8 +144,9 @@ export async function POST(
     // Haklar bitti: aşağıdaki akış seçilen hedefe sarar.
   }
 
-  // Başarısız: sarma hedefini hesapla.
-  let rewindTo = 0;
+  // Başarısız: video için saniye, PDF için sayfa hedefini hesapla.
+  const isPdf = Boolean(enrollment.course.video.pageCount);
+  let rewindTo = isPdf ? 1 : 0;
   if (
     checkpoint.onFail === CheckpointOnFail.PREVIOUS ||
     checkpoint.onFail === CheckpointOnFail.RETRY_PREVIOUS
@@ -164,7 +174,9 @@ export async function POST(
   }
 
   const duration = enrollment.course.video.durationSec;
-  const newMax = Math.min(enrollment.maxReachedSec, rewindTo);
+  // PDF başa dönerken ilk sayfanın yeniden görülmesi için erişilen sınır sıfırlanır.
+  const progressRewind = isPdf && rewindTo === 1 ? 0 : rewindTo;
+  const newMax = Math.min(enrollment.maxReachedSec, progressRewind);
   await prisma.enrollment.update({
     where: { id: enrollment.id },
     data: {

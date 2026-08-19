@@ -352,6 +352,8 @@ model Video {
   fileName    String
   contentType String   @default("video/mp4")
   durationSec Int
+  /// PDF içeriklerinde toplam sayfa; videolarda null.
+  pageCount   Int?
   sizeBytes   Int      @default(0)
   createdAt   DateTime @default(now())
 

@@ -29,6 +29,36 @@ export type ProgressResult = ProgressState & {
 };
 
 /**
+ * PDF sayfa ilerlemesi. Yalnızca sıradaki sayfa kabul edilir; böylece istemci
+ * doğrudan son sayfayı bildirerek eğitimi tamamlayamaz.
+ */
+export function computePageProgress(
+  current: ProgressState,
+  reportedPage: number,
+  pageCount: number,
+): ProgressResult {
+  const totalPages = Math.max(1, Math.floor(pageCount));
+  const reported = Math.max(1, Math.floor(reportedPage));
+  const nextAllowed = Math.max(1, Math.floor(current.maxReachedSec) + 1);
+  const accepted = reported <= nextAllowed;
+  const positionSec = Math.min(totalPages, accepted ? reported : nextAllowed);
+  const maxReachedSec = Math.min(
+    totalPages,
+    Math.max(current.maxReachedSec, positionSec),
+  );
+  const watchedPercent = (maxReachedSec / totalPages) * 100;
+
+  return {
+    positionSec,
+    maxReachedSec,
+    watchedPercent,
+    totalWatchedSec: current.totalWatchedSec,
+    videoCompleted: current.videoCompleted || maxReachedSec >= totalPages,
+    accepted,
+  };
+}
+
+/**
  * Oynatıcıdan gelen konumu mevcut duruma göre değerlendirir.
  *
  * Geriye sarma serbesttir (kullanıcı izlediği yeri tekrar izleyebilir), ancak

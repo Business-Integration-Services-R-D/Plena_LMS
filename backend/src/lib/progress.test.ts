@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MAX_FORWARD_JUMP_SEC, computeProgress, type ProgressState } from "./progress";
+import {
+  MAX_FORWARD_JUMP_SEC,
+  computePageProgress,
+  computeProgress,
+  type ProgressState,
+} from "./progress";
 
 const DURATION = 600;
 
@@ -112,5 +117,28 @@ describe("computeProgress — tamamlanma", () => {
     const result = computeProgress(state(), 0, 0);
 
     expect(Number.isFinite(result.watchedPercent)).toBe(true);
+  });
+});
+
+describe("computePageProgress — PDF sayfa sırası", () => {
+  it("sıradaki sayfayı kabul eder", () => {
+    const result = computePageProgress(state({ maxReachedSec: 3 }), 4, 10);
+    expect(result.accepted).toBe(true);
+    expect(result.maxReachedSec).toBe(4);
+    expect(result.watchedPercent).toBe(40);
+  });
+
+  it("sayfa atlamayı engeller", () => {
+    const result = computePageProgress(state({ maxReachedSec: 3 }), 9, 10);
+    expect(result.accepted).toBe(false);
+    expect(result.maxReachedSec).toBe(4);
+    expect(result.videoCompleted).toBe(false);
+  });
+
+  it("yalnızca son sayfaya sırayla gelince tamamlar", () => {
+    const result = computePageProgress(state({ maxReachedSec: 9 }), 10, 10);
+    expect(result.accepted).toBe(true);
+    expect(result.videoCompleted).toBe(true);
+    expect(result.watchedPercent).toBe(100);
   });
 });

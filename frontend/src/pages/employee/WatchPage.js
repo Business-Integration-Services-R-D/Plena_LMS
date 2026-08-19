@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { api, fmtTime } from "@/lib/api";
 import VideoPlayer from "@/components/VideoPlayer";
+import PdfPlayer from "@/components/PdfPlayer";
 import { toast } from "sonner";
 import { ArrowLeft, CheckCircle2, PartyPopper } from "lucide-react";
 
@@ -29,7 +30,7 @@ const writeQuizDraft = (assignmentId, answers) => {
 export default function WatchPage() {
   const { assignmentId } = useParams();
   const [data, setData] = useState(null);
-  const [stage, setStage] = useState(null); // video | quiz | result | done
+  const [stage, setStage] = useState(null); // content | quiz | result | done
   const [quizAnswers, setQuizAnswers] = useState(() => readQuizDraft(assignmentId));
   const [result, setResult] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -40,7 +41,7 @@ export default function WatchPage() {
     const { progress, training, assignment } = res.data;
     if (assignment.status === "completed") setStage("done");
     else if (progress.video_completed && training.quiz) setStage("quiz");
-    else setStage("video");
+    else setStage("content");
   }, [assignmentId]);
 
   useEffect(() => { load().catch(() => toast.error("Eğitim yüklenemedi")); }, [load]);
@@ -84,8 +85,8 @@ export default function WatchPage() {
     try {
       const res = await api.post(`/learn/${assignmentId}/video-complete`);
       if (res.data.has_quiz) {
-        toast.success("Video tamamlandı! Şimdi sınav zamanı.");
-        // Sınav soruları video tamamlandıktan sonra erişilebilir olur;
+        toast.success("Eğitim içeriği tamamlandı! Şimdi sınav zamanı.");
+        // Sınav soruları içerik tamamlandıktan sonra erişilebilir olur;
         // veriyi yeniden yükleyerek soruları al (stage'i load belirler).
         await load();
       } else {
@@ -93,7 +94,7 @@ export default function WatchPage() {
         setStage("done");
       }
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Video tamamlanamadı");
+      toast.error(e.response?.data?.detail || "Eğitim içeriği tamamlanamadı");
     }
   }, [assignmentId, load]);
 
@@ -125,7 +126,10 @@ export default function WatchPage() {
   );
 
   return (
-    <div className="fade-up max-w-4xl" data-testid="watch-page">
+    <div
+      className={`fade-up ${training.content_type === "pdf" ? "w-full max-w-none" : "max-w-4xl"}`}
+      data-testid="watch-page"
+    >
       <Link to="/trainings" data-testid="back-to-my-trainings" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-navy-950 mb-6 transition-colors">
         <ArrowLeft className="w-4 h-4" /> Eğitimlerim
       </Link>
@@ -133,27 +137,45 @@ export default function WatchPage() {
       <h1 className="text-3xl font-semibold tracking-tight text-navy-950 mb-2">{training.title}</h1>
       {training.description && <p className="text-base text-slate-500 mb-8 max-w-2xl">{training.description}</p>}
 
-      {stage === "video" && (
+      {stage === "content" && (
         <div>
-          <VideoPlayer
-            trainingId={training.training_id}
-            duration={training.duration}
-            checkpoints={training.checkpoints}
-            initialProgress={data.progress}
-            onHeartbeat={onHeartbeat}
-            onEvent={onEvent}
-            onCheckpoint={onCheckpoint}
-            onEnded={onEnded}
-          />
+          {training.content_type === "pdf" ? (
+            <PdfPlayer
+              trainingId={training.training_id}
+              pageCount={training.pdf_page_count}
+              checkpoints={training.checkpoints}
+              initialProgress={data.progress}
+              onHeartbeat={onHeartbeat}
+              onCheckpoint={onCheckpoint}
+              onEnded={onEnded}
+            />
+          ) : (
+            <VideoPlayer
+              trainingId={training.training_id}
+              duration={training.duration}
+              checkpoints={training.checkpoints}
+              initialProgress={data.progress}
+              onHeartbeat={onHeartbeat}
+              onEvent={onEvent}
+              onCheckpoint={onCheckpoint}
+              onEnded={onEnded}
+            />
+          )}
           <div className="mt-6 n-card p-6 flex items-center gap-6 flex-wrap">
             <p className="text-sm text-slate-500">
               <span className="font-medium text-navy-950">{training.checkpoints.length}</span> kontrol noktası
             </p>
             <p className="text-sm text-slate-500">
-              Süre: <span className="font-medium text-navy-950">{fmtTime(training.duration)}</span>
+              {training.content_type === "pdf" ? (
+                <>Uzunluk: <span className="font-medium text-navy-950">{training.pdf_page_count} sayfa</span></>
+              ) : (
+                <>Süre: <span className="font-medium text-navy-950">{fmtTime(training.duration)}</span></>
+              )}
             </p>
-            {quiz && <p className="text-sm text-slate-500">Video sonunda <span className="font-medium text-navy-950">{quiz.question_count ?? quiz.questions.length} soruluk sınav</span> var</p>}
-            <p className="text-xs text-slate-400 ml-auto">İleri sarma kapalıdır · İzlemeniz kayıt altına alınır</p>
+            {quiz && <p className="text-sm text-slate-500">İçerik sonunda <span className="font-medium text-navy-950">{quiz.question_count ?? quiz.questions.length} soruluk sınav</span> var</p>}
+            <p className="text-xs text-slate-400 ml-auto">
+              {training.content_type === "pdf" ? "Sayfalar sırayla ilerler" : "İleri sarma kapalıdır"} · İlerlemeniz kayıt altına alınır
+            </p>
           </div>
         </div>
       )}
@@ -162,7 +184,7 @@ export default function WatchPage() {
         <div className="space-y-5" data-testid="quiz-view">
           <div className="n-card p-6 flex items-center gap-3 flex-wrap">
             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-            <p className="text-sm text-slate-700">Video tamamlandı. Sınavı bitirerek eğitimi tamamlayın.{quiz.pass_score ? ` Geçme notu: %${quiz.pass_score}` : ""}</p>
+            <p className="text-sm text-slate-700">Eğitim içeriği tamamlandı. Sınavı bitirerek eğitimi tamamlayın.{quiz.pass_score ? ` Geçme notu: %${quiz.pass_score}` : ""}</p>
             <p className="text-xs text-slate-400 ml-auto">Cevaplarınız bu tarayıcıda saklanır; sayfayı yenilerseniz kaybolmaz</p>
           </div>
           {quiz.questions.map((q, i) => (
@@ -233,7 +255,7 @@ export default function WatchPage() {
             <CheckCircle2 className="w-7 h-7 text-emerald-500" />
           </div>
           <p className="text-xl font-semibold tracking-tight text-navy-950 mb-2">Bu eğitimi tamamladınız</p>
-          <p className="text-sm text-slate-500 mb-8">İzleme ve sınav kayıtlarınız denetim için saklandı.</p>
+          <p className="text-sm text-slate-500 mb-8">İlerleme ve sınav kayıtlarınız denetim için saklandı.</p>
           <Link to="/trainings" data-testid="done-back-btn" className={btnPrimary + " inline-block"}>Eğitimlerime Dön</Link>
         </div>
       )}

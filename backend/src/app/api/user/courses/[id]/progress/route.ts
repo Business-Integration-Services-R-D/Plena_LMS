@@ -4,7 +4,8 @@ import { z } from "zod";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { checkWindow } from "@/lib/enrollment";
-import { computeProgress } from "@/lib/progress";
+import { effectiveQuestionCount, resolveExamSettings } from "@/lib/exam";
+import { computePageProgress, computeProgress } from "@/lib/progress";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,28 @@ export async function POST(
 
   const enrollment = await prisma.enrollment.findUnique({
     where: { userId_courseId: { userId: session.id, courseId } },
-    include: { course: { include: { video: true } } },
+    include: {
+      course: {
+        include: {
+          video: true,
+          questionPool: {
+            select: {
+              _count: { select: { questions: { where: { active: true } } } },
+            },
+          },
+          exam: {
+            include: {
+              questionPool: {
+                select: {
+                  _count: { select: { questions: { where: { active: true } } } },
+                },
+              },
+            },
+          },
+          checkpoints: { select: { id: true } },
+        },
+      },
+    },
   });
   if (!enrollment?.course.video) {
     return NextResponse.json({ error: "Kayıt bulunamadı" }, { status: 404 });
@@ -41,16 +63,61 @@ export async function POST(
     return NextResponse.json({ error: window.reason }, { status: 403 });
   }
 
-  const progress = computeProgress(
-    enrollment,
-    parsed.data.positionSec,
-    enrollment.course.video.durationSec,
-  );
+  const pageCount = enrollment.course.video.pageCount;
+  const progress = pageCount
+    ? computePageProgress(enrollment, parsed.data.positionSec, pageCount)
+    : computeProgress(
+        enrollment,
+        parsed.data.positionSec,
+        enrollment.course.video.durationSec,
+      );
+  const wantsCompletion = parsed.data.eventType === "COMPLETE";
+
+  const checkpointIds = new Set(enrollment.course.checkpoints.map((cp) => cp.id));
+  let checkpointsComplete = checkpointIds.size === 0;
+  if (progress.videoCompleted && !checkpointsComplete) {
+    const passedEvents = await prisma.watchEvent.findMany({
+      where: {
+        enrollmentId: enrollment.id,
+        eventType: WatchEventType.CHECKPOINT_PASSED,
+      },
+      select: { metadata: true },
+    });
+    const passedIds = new Set(
+      passedEvents
+        .map((event) => (event.metadata as { checkpointId?: string } | null)?.checkpointId)
+        .filter(Boolean),
+    );
+    checkpointsComplete = [...checkpointIds].every((id) => passedIds.has(id));
+    if (wantsCompletion && !checkpointsComplete) {
+      return NextResponse.json(
+        { error: "Tüm kontrol noktaları tamamlanmadan eğitim bitirilemez" },
+        { status: 409 },
+      );
+    }
+  }
+
+  // PDF'de son sayfayı açmak yetmez; kullanıcı son sayfadaki tamamlama
+  // düğmesine de basmalıdır.
+  const contentCompleted =
+    enrollment.videoCompleted ||
+    (progress.videoCompleted &&
+      checkpointsComplete &&
+      (!pageCount || wantsCompletion));
+  const settings = resolveExamSettings(enrollment.course, enrollment.course.exam);
+  const poolTotal =
+    enrollment.course.exam?.questionPool?._count.questions ??
+    enrollment.course.questionPool?._count.questions ??
+    0;
+  const hasQuiz = effectiveQuestionCount(settings, poolTotal) > 0;
+  const completedWithoutQuiz = contentCompleted && !hasQuiz;
 
   const status: EnrollmentStatus =
     enrollment.status === EnrollmentStatus.COMPLETED
       ? EnrollmentStatus.COMPLETED
-      : EnrollmentStatus.IN_PROGRESS;
+      : completedWithoutQuiz
+        ? EnrollmentStatus.COMPLETED
+        : EnrollmentStatus.IN_PROGRESS;
 
   const updated = await prisma.enrollment.update({
     where: { id: enrollment.id },
@@ -59,10 +126,11 @@ export async function POST(
       maxReachedSec: progress.maxReachedSec,
       watchedPercent: progress.watchedPercent,
       totalWatchedSec: progress.totalWatchedSec,
-      videoCompleted: progress.videoCompleted,
+      videoCompleted: contentCompleted,
       status,
       firstStartedAt: enrollment.firstStartedAt ?? new Date(),
       lastActivityAt: new Date(),
+      completedAt: completedWithoutQuiz ? (enrollment.completedAt ?? new Date()) : enrollment.completedAt,
     },
   });
 

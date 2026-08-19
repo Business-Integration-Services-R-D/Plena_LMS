@@ -45,7 +45,17 @@ export async function PUT(
 
   const items = parsed.data.checkpoints;
 
-  if (course.video) {
+  if (course.video?.pageCount) {
+    const beyond = items.find(
+      (cp) => cp.timeSec < 1 || cp.timeSec > course.video!.pageCount!,
+    );
+    if (beyond) {
+      return NextResponse.json(
+        { error: "Kontrol noktası PDF sayfa aralığında olmalı" },
+        { status: 400 },
+      );
+    }
+  } else if (course.video) {
     const beyond = items.find((cp) => cp.timeSec >= course.video!.durationSec);
     if (beyond) {
       return NextResponse.json(

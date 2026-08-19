@@ -69,6 +69,8 @@ export async function GET() {
           passPercent: settings.passPercent,
           maxAttempts: settings.maxAttempts,
           durationSec: e.course.video?.durationSec ?? 0,
+          contentType: e.course.video?.contentType ?? null,
+          pageCount: e.course.video?.pageCount ?? null,
           questionCount: effectiveQuestionCount(settings, poolTotal),
           checkpointCount: e.course._count.checkpoints,
         },

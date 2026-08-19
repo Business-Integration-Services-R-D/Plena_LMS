@@ -97,6 +97,8 @@ const mapCourse = (c) => ({
   description: c.description,
   video_filename: c.video?.fileName || null,
   video_size: c.video?.sizeBytes || 0,
+  content_type: c.video?.pageCount ? "pdf" : c.video ? "video" : null,
+  pdf_page_count: c.video?.pageCount || 0,
   duration: c.video?.durationSec || 0,
   checkpoints: (c.checkpoints || []).map(mapCheckpoint),
   assignment_count: c.assignmentCount || 0,
@@ -934,6 +936,8 @@ const routes = [
         training_description: e.course.description,
         watch_pct: Math.round(e.watchedPercent || 0),
         duration: e.course.durationSec || 0,
+        content_type: e.course.pageCount ? "pdf" : e.course.contentType ? "video" : null,
+        pdf_page_count: e.course.pageCount || 0,
         has_quiz: (e.course.questionCount || 0) > 0,
         quiz_question_count: e.course.questionCount || 0,
         checkpoint_count: e.course.checkpointCount || 0,
@@ -975,6 +979,7 @@ const routes = [
       learnCache.set(courseId, {
         ...(learnCache.get(courseId) || {}),
         duration: play.video.durationSec,
+        contentType: play.video.pageCount ? "pdf" : "video",
         hasQuiz,
         cpChoiceMap,
       });
@@ -1014,6 +1019,8 @@ const routes = [
           title: play.course.title,
           description: play.course.description,
           duration: play.video.durationSec,
+          content_type: play.video.pageCount ? "pdf" : "video",
+          pdf_page_count: play.video.pageCount || 0,
           checkpoints,
           quiz,
         },
@@ -1184,9 +1191,10 @@ export const api = {
   delete: (url, config) => dispatch("DELETE", url, undefined, config),
 };
 
-// Video stream: edu_module'de kurs bazlı authenticated stream endpoint'i
+// Ana eğitim içeriği (MP4/PDF): kurs bazlı kimlik doğrulamalı stream endpoint'i.
 export const videoUrl = (trainingId) =>
   `${BACKEND_URL}/api/user/courses/${trainingId}/video`;
+export const contentUrl = videoUrl;
 
 // ---------------------------------------------------------------------------
 // UI yardımcıları (değişmedi)

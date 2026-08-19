@@ -63,7 +63,7 @@ export async function GET(
   }
 
   if (!enrollment.course.video) {
-    return NextResponse.json({ error: "Eğitim videosu yok" }, { status: 404 });
+    return NextResponse.json({ error: "Eğitim içeriği yok" }, { status: 404 });
   }
 
   await prisma.watchEvent.create({
@@ -113,6 +113,9 @@ export async function GET(
     video: {
       id: enrollment.course.video.id,
       durationSec: enrollment.course.video.durationSec,
+      contentType: enrollment.course.video.contentType,
+      pageCount: enrollment.course.video.pageCount,
+      fileName: enrollment.course.video.fileName,
       url: `/api/user/courses/${courseId}/video`,
     },
     checkpoints: enrollment.course.checkpoints.map((cp) => ({
