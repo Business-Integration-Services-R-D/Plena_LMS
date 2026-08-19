@@ -73,6 +73,7 @@ Resources:
                 Action:
                   - s3:GetObject
                   - s3:PutObject
+                  - s3:DeleteObject
                 Resource: !Sub arn:${AWS::Partition}:s3:::${ArtifactBucketName}/deploy/releases/*
               - Effect: Allow
                 Action: ssm:SendCommand

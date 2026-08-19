@@ -25,6 +25,8 @@ jobs:
       AWS_INSTANCE_ID: ${{ vars.AWS_INSTANCE_ID }}
       AWS_ARTIFACT_BUCKET: ${{ vars.AWS_ARTIFACT_BUCKET }}
       APP_URL: ${{ vars.APP_URL }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      EMAIL_FROM: ${{ vars.EMAIL_FROM }}
     steps:
       - name: Validate deployment configuration
         shell: bash
@@ -36,6 +38,10 @@ jobs:
               exit 1
             fi
           done
+          if [ -z "${RESEND_API_KEY:-}" ]; then
+            echo "Missing GitHub production secret: RESEND_API_KEY" >&2
+            exit 1
+          fi
 
       - name: Checkout
         uses: actions/checkout@v7
