@@ -1,7 +1,13 @@
 name: Deploy production
 
 on:
-  workflow_call:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -15,10 +21,11 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to AWS production
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     environment: production
     env:
-      RELEASE_SHA: ${{ github.sha }}
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
       AWS_REGION: ${{ vars.AWS_REGION }}
       AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
       AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}

@@ -69,14 +69,3 @@ jobs:
           REACT_APP_AUTH_BYPASS: "false"
           GENERATE_SOURCEMAP: "false"
         run: yarn build
-
-  deploy-production:
-    name: Deploy production
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs:
-      - backend
-      - frontend
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/deploy-production.yml
