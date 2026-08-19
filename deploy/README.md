@@ -46,8 +46,10 @@ curl -fsS "https://${APP_DOMAIN}/api/health"
 ## GitHub Actions production pipeline
 
 Pull requests run backend tests/build and the frontend build. After a merge to
-`main`, the same `CI` workflow calls `.github/workflows/deploy-production.yml`
-only when both validation jobs succeed. The deployment workflow:
+`main`, `.github/workflows/deploy-production.yml` starts from the successful
+completion of the `CI` workflow. Keeping deployment as a direct workflow lets
+the protected `production` environment provide its secrets to the job. The
+deployment workflow:
 
 1. assumes a least-privilege AWS role through GitHub OIDC;
 2. packages the exact merge commit and uploads it to the private S3 bucket;
