@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { api, videoUrl, fmtTime } from "@/lib/api";
+import { api, contentUrl, fmtTime } from "@/lib/api";
 import { PageHeader } from "@/components/Layout";
+import PdfPreview from "@/components/PdfPreview";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock, ChevronDown } from "lucide-react";
+import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock, ChevronDown, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 
 const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
 
@@ -19,6 +20,18 @@ const clampPoints = (value) => {
 };
 const btnPrimary = "px-5 py-2.5 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow] disabled:opacity-40";
 
+// PDF sayfa ağacındaki en yüksek /Count değeri toplam sayfa sayısıdır.
+// Yönetici yüklemesinde tarayıcıda hesaplanır, sunucuya da sınır kontrolüyle iletilir.
+const countPdfPages = async (file) => {
+  const text = new TextDecoder("latin1").decode(await file.arrayBuffer());
+  const counts = [];
+  const pageTree = /\/Type\s*\/Pages\b[\s\S]{0,1200}?\/Count\s+(\d+)/g;
+  let match;
+  while ((match = pageTree.exec(text))) counts.push(Number(match[1]));
+  if (counts.length) return Math.max(...counts);
+  return (text.match(/\/Type\s*\/Page\b/g) || []).length;
+};
+
 export default function TrainingDetailPage() {
   const { trainingId } = useParams();
   const [training, setTraining] = useState(null);
@@ -32,6 +45,7 @@ export default function TrainingDetailPage() {
   const [questionPoints, setQuestionPoints] = useState({});
   // Önizleme üzerinden kontrol noktası ekleme akışı
   const [previewTime, setPreviewTime] = useState(0);
+  const [previewPage, setPreviewPage] = useState(1);
   const [previewPaused, setPreviewPaused] = useState(true);
   const [cpPanelOpen, setCpPanelOpen] = useState(false);
   const [cpAnchor, setCpAnchor] = useState(0); // panel açıldığı anda seçilen saniye
@@ -75,31 +89,51 @@ export default function TrainingDetailPage() {
     setQuestionPoints(training?.quiz?.question_points || {});
   }, [training]);
 
-  const uploadVideo = async (file) => {
+  const uploadContent = async (file) => {
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".mp4")) return toast.error("Sadece MP4 formatı destekleniyor");
-    if (file.size > 250 * 1024 * 1024) return toast.error("Video 250MB sınırını aşıyor");
-    const duration = await new Promise((resolve) => {
-      const v = document.createElement("video");
-      v.preload = "metadata";
-      v.onloadedmetadata = () => { URL.revokeObjectURL(v.src); resolve(v.duration || 0); };
-      v.onerror = () => resolve(0);
-      v.src = URL.createObjectURL(file);
-    });
+    if (
+      training?.video_filename &&
+      !window.confirm("İçeriği değiştirmek mevcut kontrol noktalarını ve kullanıcı ilerlemelerini sıfırlar. Devam edilsin mi?")
+    ) {
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
+    const isPdfFile = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
+    const isVideoFile = file.name.toLowerCase().endsWith(".mp4") || file.type === "video/mp4";
+    if (!isPdfFile && !isVideoFile) return toast.error("Yalnızca MP4 video veya PDF yükleyebilirsiniz");
+    if (isPdfFile && file.size > 50 * 1024 * 1024) return toast.error("PDF 50MB sınırını aşıyor");
+    if (isVideoFile && file.size > 250 * 1024 * 1024) return toast.error("Video 250MB sınırını aşıyor");
+
+    let duration = 0;
+    let pageCount = 0;
+    if (isPdfFile) {
+      pageCount = await countPdfPages(file);
+      if (!pageCount) return toast.error("PDF sayfa sayısı belirlenemedi");
+    } else {
+      duration = await new Promise((resolve) => {
+        const v = document.createElement("video");
+        v.preload = "metadata";
+        v.onloadedmetadata = () => { URL.revokeObjectURL(v.src); resolve(v.duration || 0); };
+        v.onerror = () => resolve(0);
+        v.src = URL.createObjectURL(file);
+      });
+    }
     const fd = new FormData();
     fd.append("file", file);
     fd.append("duration", duration);
+    if (isPdfFile) fd.append("pageCount", pageCount);
     setUploading(1);
     try {
       await api.post(`/trainings/${trainingId}/video`, fd, {
         onUploadProgress: (e) => setUploading(Math.max(1, Math.round((e.loaded / e.total) * 100))),
       });
-      toast.success("Video yüklendi");
+      toast.success(isPdfFile ? "PDF yüklendi" : "Video yüklendi");
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Video yüklenemedi");
+      toast.error(e.response?.data?.detail || "İçerik yüklenemedi");
     } finally {
       setUploading(0);
+      if (fileRef.current) fileRef.current.value = "";
     }
   };
 
@@ -119,7 +153,7 @@ export default function TrainingDetailPage() {
 
   // Önizlemede seçili ana kontrol noktası ekleme paneli aç/kapat.
   const openCpPanel = () => {
-    setCpAnchor(Math.floor(previewRef.current?.currentTime || 0));
+    setCpAnchor(training?.content_type === "pdf" ? previewPage : Math.floor(previewRef.current?.currentTime || 0));
     setCpInline({
       question_id: "",
       has_timeout: false,
@@ -174,7 +208,8 @@ export default function TrainingDetailPage() {
 
   const addCheckpointFromPreview = async () => {
     if (!cpInline.question_id) return toast.error("Bir soru seçin");
-    if (training.duration && cpAnchor >= training.duration) return toast.error("Süre video uzunluğunu aşıyor");
+    if (training.content_type === "pdf" && (cpAnchor < 1 || cpAnchor > training.pdf_page_count)) return toast.error("Sayfa PDF aralığını aşıyor");
+    if (training.content_type !== "pdf" && training.duration && cpAnchor >= training.duration) return toast.error("Süre video uzunluğunu aşıyor");
     setCpAdding(true);
     try {
       await saveCheckpoints([
@@ -189,7 +224,7 @@ export default function TrainingDetailPage() {
           retry_exhausted: cpInline.retry_exhausted,
         },
       ]);
-      toast.success(`Kontrol noktası eklendi (${fmtTime(cpAnchor)})`);
+      toast.success(`Kontrol noktası eklendi (${training.content_type === "pdf" ? `Sayfa ${cpAnchor}` : fmtTime(cpAnchor)})`);
       setCpPanelOpen(false);
     } catch (e) {
       toast.error(e.response?.data?.detail || "Kontrol noktası eklenemedi");
@@ -268,6 +303,8 @@ export default function TrainingDetailPage() {
     0,
   );
   const pointsOverLimit = scoringMode === "per_question" && totalPoints > MAX_TOTAL_POINTS;
+  const isPdf = training.content_type === "pdf";
+  const fmtPosition = (value) => isPdf ? `Sayfa ${value}` : fmtTime(value);
 
   return (
     <div className="fade-up" data-testid="training-detail-page">
@@ -277,55 +314,80 @@ export default function TrainingDetailPage() {
       <PageHeader overline="Eğitim Düzenleyici" title={training.title} subtitle={training.description} />
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* VIDEO */}
+        {/* ANA EĞİTİM İÇERİĞİ */}
         <div className="n-card p-8">
-          <h2 className="text-lg font-medium tracking-tight text-navy-950 mb-6">Eğitim Videosu</h2>
+          <h2 className="text-lg font-medium tracking-tight text-navy-950 mb-6">Eğitim İçeriği</h2>
           {training.video_filename ? (
             <div>
-              <video
-                ref={previewRef}
-                src={videoUrl(training.training_id)}
-                controls
-                className="w-full rounded-xl bg-black"
-                data-testid="admin-video-preview"
-                onTimeUpdate={() => setPreviewTime(previewRef.current?.currentTime || 0)}
-                onPause={() => setPreviewPaused(true)}
-                onPlay={() => setPreviewPaused(false)}
-              />
-
-              {/* Kontrol noktası şeridi: sarı işaretlere tıklayınca o ana gider */}
-              {(training.checkpoints || []).length > 0 && training.duration > 0 && (
-                <div className="relative h-2 mt-3 rounded-full bg-slate-100" data-testid="cp-preview-strip">
-                  <div className="absolute inset-y-0 left-0 rounded-full bg-brand-500/30" style={{ width: `${Math.min(100, (previewTime / training.duration) * 100)}%` }} />
-                  {(training.checkpoints || []).map((cp) => (
-                    <button
-                      key={cp.id}
-                      data-testid={`cp-preview-marker-${cp.id}`}
-                      title={`${fmtTime(cp.time)} · ${qById[cp.question_id]?.text || "Soru silinmiş"}`}
-                      onClick={() => {
-                        const v = previewRef.current;
-                        if (!v) return;
-                        v.currentTime = cp.time;
-                        v.pause();
-                        setPreviewTime(cp.time);
-                      }}
-                      className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber-400 border-2 border-white shadow hover:scale-125 transition-transform"
-                      style={{ left: `${Math.min(100, (cp.time / training.duration) * 100)}%` }}
-                    />
-                  ))}
+              {isPdf ? (
+                <div>
+                  <PdfPreview
+                    trainingId={training.training_id}
+                    page={previewPage}
+                    pageCount={training.pdf_page_count}
+                    onPageChange={setPreviewPage}
+                  />
+                  <div className="flex items-center justify-center gap-4 mt-3">
+                    <button type="button" onClick={() => setPreviewPage((p) => Math.max(1, p - 1))} disabled={previewPage <= 1} className="p-2 rounded-full border border-navy-900/10 disabled:opacity-30">
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-sm text-slate-600 tabular-nums">Sayfa {previewPage} / {training.pdf_page_count}</span>
+                    <button type="button" onClick={() => setPreviewPage((p) => Math.min(training.pdf_page_count, p + 1))} disabled={previewPage >= training.pdf_page_count} className="p-2 rounded-full border border-navy-900/10 disabled:opacity-30">
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <video
+                    ref={previewRef}
+                    src={contentUrl(training.training_id)}
+                    controls
+                    className="w-full rounded-xl bg-black"
+                    data-testid="admin-video-preview"
+                    onTimeUpdate={() => setPreviewTime(previewRef.current?.currentTime || 0)}
+                    onPause={() => setPreviewPaused(true)}
+                    onPlay={() => setPreviewPaused(false)}
+                  />
+
+                  {/* Kontrol noktası şeridi: sarı işaretlere tıklayınca o ana gider */}
+                  {(training.checkpoints || []).length > 0 && training.duration > 0 && (
+                    <div className="relative h-2 mt-3 rounded-full bg-slate-100" data-testid="cp-preview-strip">
+                      <div className="absolute inset-y-0 left-0 rounded-full bg-brand-500/30" style={{ width: `${Math.min(100, (previewTime / training.duration) * 100)}%` }} />
+                      {(training.checkpoints || []).map((cp) => (
+                        <button
+                          key={cp.id}
+                          data-testid={`cp-preview-marker-${cp.id}`}
+                          title={`${fmtTime(cp.time)} · ${qById[cp.question_id]?.text || "Soru silinmiş"}`}
+                          onClick={() => {
+                            const v = previewRef.current;
+                            if (!v) return;
+                            v.currentTime = cp.time;
+                            v.pause();
+                            setPreviewTime(cp.time);
+                          }}
+                          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-amber-400 border-2 border-white shadow hover:scale-125 transition-transform"
+                          style={{ left: `${Math.min(100, (cp.time / training.duration) * 100)}%` }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="flex items-center justify-between gap-3 flex-wrap mt-4">
-                <p className="text-sm text-slate-400">Süre: {fmtTime(training.duration)} · {(training.video_size / 1024 / 1024).toFixed(1)} MB</p>
-                <button data-testid="replace-video-btn" onClick={() => fileRef.current?.click()} className="text-sm text-brand-600 font-medium hover:underline">Videoyu değiştir</button>
+                <p className="text-sm text-slate-400">
+                  {isPdf ? `${training.pdf_page_count} sayfa` : `Süre: ${fmtTime(training.duration)}`} · {(training.video_size / 1024 / 1024).toFixed(1)} MB
+                </p>
+                <button data-testid="replace-video-btn" onClick={() => fileRef.current?.click()} className="text-sm text-brand-600 font-medium hover:underline">İçeriği değiştir</button>
               </div>
 
               {/* Duraklatılan ana kontrol noktası ekleme */}
-              {previewPaused && !cpPanelOpen && (
+              {(isPdf || previewPaused) && !cpPanelOpen && (
                 <div className="flex items-center justify-between gap-3 flex-wrap mt-3 px-4 py-3 rounded-xl bg-[#F5F8FA] border n-hairline fade-up">
                   <span className="flex items-center gap-1.5 text-sm text-slate-600 tabular-nums">
-                    <Clock className="w-3.5 h-3.5 text-brand-600" /> Seçilen an: <span className="font-medium text-navy-950">{fmtTime(Math.floor(previewTime))}</span>
+                    {isPdf ? <FileText className="w-3.5 h-3.5 text-brand-600" /> : <Clock className="w-3.5 h-3.5 text-brand-600" />}
+                    Seçilen {isPdf ? "sayfa" : "an"}: <span className="font-medium text-navy-950">{isPdf ? previewPage : fmtTime(Math.floor(previewTime))}</span>
                   </span>
                   <button data-testid="cp-preview-add-btn" className={btnPrimary + " !px-4 !py-2"} onClick={openCpPanel}>
                     <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> Kontrol Noktası Ekle</span>
@@ -337,7 +399,8 @@ export default function TrainingDetailPage() {
                 <div className="mt-3 p-5 rounded-xl bg-[#F5F8FA] border n-hairline space-y-3 fade-up" data-testid="cp-preview-panel">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-medium text-navy-950 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-brand-600" /> {fmtTime(cpAnchor)} noktasına kontrol noktası
+                      {isPdf ? <FileText className="w-3.5 h-3.5 text-brand-600" /> : <Clock className="w-3.5 h-3.5 text-brand-600" />}
+                      {fmtPosition(cpAnchor)} noktasına kontrol noktası
                     </p>
                     <button data-testid="cp-preview-cancel-btn" onClick={() => setCpPanelOpen(false)} className="text-sm text-slate-400 hover:text-slate-700 transition-colors">Vazgeç</button>
                   </div>
@@ -433,7 +496,7 @@ export default function TrainingDetailPage() {
                       </select>
                     ) : (
                       <p className="px-3 py-2 rounded-lg text-xs text-slate-500 bg-white border border-navy-900/10">
-                        Süre sınırı olmadığı için başarısızlık durumu yoktur; kullanıcı cevabını yazana kadar video devam etmez.
+                        Süre sınırı olmadığı için başarısızlık durumu yoktur; kullanıcı cevabını yazana kadar içerik devam etmez.
                       </p>
                     )
                   ) : (
@@ -458,7 +521,7 @@ export default function TrainingDetailPage() {
                           value={cpInline.retry_exhausted}
                           onChange={(e) => setCpInline({ ...cpInline, retry_exhausted: e.target.value })}
                         >
-                          <option value="start">Video başa dönsün</option>
+                          <option value="start">{isPdf ? "PDF başa dönsün" : "Video başa dönsün"}</option>
                           <option value="previous">Bir önceki kontrol noktasına dönsün</option>
                         </select>
                       </div>
@@ -466,7 +529,7 @@ export default function TrainingDetailPage() {
                   )}
                   <button data-testid="cp-preview-save-btn" className={btnPrimary + " w-full"} disabled={cpAdding || !cpInline.question_id} onClick={addCheckpointFromPreview}>
                     <span className="flex items-center justify-center gap-2">
-                      <Plus className="w-4 h-4" /> {cpAdding ? "Ekleniyor..." : `${fmtTime(cpAnchor)} Noktasına Ekle`}
+                      <Plus className="w-4 h-4" /> {cpAdding ? "Ekleniyor..." : `${fmtPosition(cpAnchor)} Noktasına Ekle`}
                     </span>
                   </button>
                   </>
@@ -483,8 +546,8 @@ export default function TrainingDetailPage() {
               <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
                 <UploadCloud className="w-6 h-6 text-slate-400" />
               </div>
-              <p className="text-sm font-medium text-slate-700">MP4 video yükleyin</p>
-              <p className="text-xs text-slate-400">Maksimum 250MB</p>
+              <p className="text-sm font-medium text-slate-700">MP4 video veya PDF yükleyin</p>
+              <p className="text-xs text-slate-400">Video 250MB · PDF 50MB</p>
             </button>
           )}
           {uploading > 0 && (
@@ -495,18 +558,21 @@ export default function TrainingDetailPage() {
               <p className="text-xs text-slate-400 mt-2">Yükleniyor... %{uploading}</p>
             </div>
           )}
-          <input ref={fileRef} type="file" accept="video/mp4" className="hidden" data-testid="video-file-input" onChange={(e) => uploadVideo(e.target.files?.[0])} />
+          <input ref={fileRef} type="file" accept="video/mp4,application/pdf,.mp4,.pdf" className="hidden" data-testid="video-file-input" onChange={(e) => uploadContent(e.target.files?.[0])} />
         </div>
 
         {/* CHECKPOINTS */}
         <div className="n-card p-8">
           <h2 className="text-lg font-medium tracking-tight text-navy-950 mb-1">Kontrol Noktaları</h2>
-          <p className="text-sm text-slate-400 mb-6">Video belirtilen sürede durur ve soru sorar.</p>
+          <p className="text-sm text-slate-400 mb-6">{isPdf ? "PDF belirtilen sayfada durur ve soru sorar." : "Video belirtilen sürede durur ve soru sorar."}</p>
           <div className="space-y-3 mb-6">
             {(training.checkpoints || []).length === 0 && <p className="text-sm text-slate-400">Henüz kontrol noktası yok.</p>}
             {(training.checkpoints || []).map((cp) => (
               <div key={cp.id} className="flex items-center gap-4 px-4 py-3 rounded-xl bg-[#F5F8FA] border n-hairline flex-wrap" data-testid={`checkpoint-item-${cp.id}`}>
-                <span className="flex items-center gap-1.5 text-sm font-medium text-navy-950 tabular-nums"><Clock className="w-3.5 h-3.5 text-brand-600" />{fmtTime(cp.time)}</span>
+                <span className="flex items-center gap-1.5 text-sm font-medium text-navy-950 tabular-nums">
+                  {isPdf ? <FileText className="w-3.5 h-3.5 text-brand-600" /> : <Clock className="w-3.5 h-3.5 text-brand-600" />}
+                  {fmtPosition(cp.time)}
+                </span>
                 <p className="flex-1 text-sm text-slate-600 truncate">{qById[cp.question_id]?.text || "Soru silinmiş"}</p>
                 <span className="text-xs text-slate-400 whitespace-nowrap">
                   {cp.timeout_seconds != null ? `${cp.timeout_seconds}sn` : "Süresiz"} · {
@@ -518,7 +584,7 @@ export default function TrainingDetailPage() {
             ))}
           </div>
           <p className="text-xs text-slate-400">
-            Yeni kontrol noktası eklemek için soldaki önizlemede videoyu istediğiniz anda duraklatıp "Kontrol Noktası Ekle" butonunu kullanın.
+            Yeni kontrol noktası eklemek için soldaki önizlemede {isPdf ? "istediğiniz sayfaya gidip" : "videoyu istediğiniz anda duraklatıp"} "Kontrol Noktası Ekle" butonunu kullanın.
           </p>
         </div>
 
@@ -692,7 +758,7 @@ export default function TrainingDetailPage() {
               </div>
             ) : (
               <p className="px-3 py-2 rounded-lg text-xs text-amber-700 bg-amber-50 border border-amber-200">
-                Serbest metin soruda doğru cevap yoktur. Kullanıcı boş olmayan bir cevap yazarsa videoya devam eder; cevap raporlarda değerlendirmeniz için listelenir.
+                Serbest metin soruda doğru cevap yoktur. Kullanıcı boş olmayan bir cevap yazarsa içeriğe devam eder; cevap raporlarda değerlendirmeniz için listelenir.
               </p>
             )}
             <button

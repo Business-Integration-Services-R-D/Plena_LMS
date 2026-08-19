@@ -31,6 +31,7 @@ export async function GET() {
       group: a.group,
       startsAt: a.startsAt,
       dueAt: a.dueAt,
+      reminderDays: a.reminderDays,
       assignedAt: a.assignedAt,
       enrollmentCount: a._count.enrollments,
     })),
@@ -45,9 +46,14 @@ const schema = z
     groupId: z.string().min(1).optional(),
     startsAt: z.string().min(1),
     dueAt: z.string().optional().nullable(),
+    reminderDays: z.number().int().min(0).max(365).default(0),
   })
   .refine((v) => (v.target === "USER" ? Boolean(v.userId) : Boolean(v.groupId)), {
     message: "Hedef seçilmedi",
+  })
+  .refine((v) => v.reminderDays === 0 || Boolean(v.dueAt), {
+    message: "Hatırlatma için son tarih gerekli",
+    path: ["reminderDays"],
   });
 
 export async function POST(req: NextRequest) {
@@ -62,7 +68,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { courseId, target, startsAt, dueAt } = parsed.data;
+  const { courseId, target, startsAt, dueAt, reminderDays } = parsed.data;
   const userId = target === "USER" ? parsed.data.userId! : null;
   const groupId = target === "GROUP" ? parsed.data.groupId! : null;
 
@@ -87,7 +93,7 @@ export async function POST(req: NextRequest) {
       target === "USER"
         ? { courseId_userId: { courseId, userId: userId! } }
         : { courseId_groupId: { courseId, groupId: groupId! } },
-    update: { startsAt: startsAtDate, dueAt: dueAtDate },
+    update: { startsAt: startsAtDate, dueAt: dueAtDate, reminderDays },
     create: {
       courseId,
       target,
@@ -95,6 +101,7 @@ export async function POST(req: NextRequest) {
       groupId,
       startsAt: startsAtDate,
       dueAt: dueAtDate,
+      reminderDays,
       assignedById: session.id,
     },
   });
@@ -113,6 +120,7 @@ export async function POST(req: NextRequest) {
       groupId,
       startsAt: startsAtDate.toISOString(),
       dueAt: dueAtDate?.toISOString() ?? null,
+      reminderDays,
       enrolled,
     },
   });

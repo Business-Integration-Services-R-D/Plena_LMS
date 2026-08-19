@@ -9,7 +9,7 @@ import { parseRangeHeader } from "@/lib/range";
 export const dynamic = "force-dynamic";
 
 /**
- * Videoyu kimlik doğrulamalı olarak servis eder.
+ * Ana eğitim içeriğini (MP4/PDF) kimlik doğrulamalı olarak servis eder.
  *
  * Range destekli: oynatıcı kaldığı yerden devam ederken tüm dosyayı indirmek
  * zorunda kalmaz. Bu bir ileri sarma açığı yaratmaz; izleme ilerlemesi
@@ -48,7 +48,7 @@ export async function GET(
   }
 
   if (!video) {
-    return NextResponse.json({ error: "Video yok" }, { status: 404 });
+    return NextResponse.json({ error: "Eğitim içeriği yok" }, { status: 404 });
   }
 
   const contentType = video.contentType || "video/mp4";
@@ -68,6 +68,10 @@ export async function GET(
       "Content-Type": contentType,
       "Accept-Ranges": "bytes",
       "Cache-Control": "private, max-age=60",
+      "X-Content-Type-Options": "nosniff",
+      ...(video.pageCount
+        ? { "Content-Disposition": 'inline; filename="training.pdf"' }
+        : {}),
     };
 
     if (parsed.kind === "ok") {
@@ -89,7 +93,7 @@ export async function GET(
       headers: { ...baseHeaders, "Content-Length": String(size) },
     });
   } catch (err) {
-    console.error("Video servis edilemedi:", video.storageKey, err);
-    return NextResponse.json({ error: "Video okunamadı" }, { status: 500 });
+    console.error("Eğitim içeriği servis edilemedi:", video.storageKey, err);
+    return NextResponse.json({ error: "Eğitim içeriği okunamadı" }, { status: 500 });
   }
 }

@@ -35,7 +35,7 @@ export default function AssignmentsPage() {
         reminder_days: Number(form.reminder_days) || 0,
       };
       const res = await api.post("/assignments", payload);
-      toast.success(`${res.data.created} atama oluşturuldu, bilgilendirme mailleri gönderildi`);
+      toast.success(`${res.data.created} atama oluşturuldu. Uygulama içi bildirimler planlandı`);
       setModal(false);
       setForm({ training_id: "", user_ids: [], group_ids: [], start_at: "", due_at: "", reminder_days: 0 });
       load();
@@ -92,7 +92,7 @@ export default function AssignmentsPage() {
                 </td>
                 <td className="px-6 py-4 text-slate-400">{fmtDate(a.start_at)}</td>
                 <td className="px-6 py-4 text-slate-400">{fmtDate(a.due_at)}</td>
-                <td className="px-6 py-4 text-slate-400">{a.reminder_days ? `${a.reminder_days} günde bir` : "-"}</td>
+                <td className="px-6 py-4 text-slate-400">{a.reminder_days ? `Son ${a.reminder_days} gün, günlük` : "-"}</td>
                 <td className="px-6 py-4 text-right">
                   <button data-testid={`delete-assignment-${a.assignment_id}`} onClick={() => remove(a)} className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
                     <Trash2 className="w-4 h-4" />
@@ -145,12 +145,12 @@ export default function AssignmentsPage() {
               </div>
               <div>
                 <p className="text-xs text-slate-400 mb-1.5">Son tarih (opsiyonel)</p>
-                <input data-testid="assignment-due-input" type="datetime-local" className={inputCls} value={form.due_at} onChange={(e) => setForm({ ...form, due_at: e.target.value })} />
+                <input data-testid="assignment-due-input" type="datetime-local" className={inputCls} value={form.due_at} onChange={(e) => setForm({ ...form, due_at: e.target.value, ...(!e.target.value ? { reminder_days: 0 } : {}) })} />
               </div>
             </div>
             <div>
-              <p className="text-xs text-slate-400 mb-1.5">Hatırlatma periyodu (gün, 0 = kapalı)</p>
-              <input data-testid="assignment-reminder-input" type="number" min="0" className={inputCls} value={form.reminder_days} onChange={(e) => setForm({ ...form, reminder_days: e.target.value })} />
+              <p className="text-xs text-slate-400 mb-1.5">Son N gün boyunca günlük hatırlatma (0 = kapalı)</p>
+              <input data-testid="assignment-reminder-input" type="number" min="0" max="365" disabled={!form.due_at} className={inputCls} value={form.reminder_days} onChange={(e) => setForm({ ...form, reminder_days: e.target.value })} />
             </div>
             <button data-testid="assignment-create-btn" className={btnPrimary + " w-full"} disabled={!form.training_id || (form.user_ids.length === 0 && form.group_ids.length === 0)} onClick={create}>
               Atamayı Oluştur

@@ -34,7 +34,7 @@ export async function PATCH(
   if (parsed.data.password) data.passwordHash = await hashPassword(parsed.data.password);
 
   const before = await prisma.user.findUnique({
-    where: { id },
+    where: { id, deletedAt: null },
     select: { active: true, name: true },
   });
   if (!before) {
@@ -67,4 +67,54 @@ export async function PATCH(
   });
 
   return NextResponse.json(user);
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const session = await requireSession([Role.ADMIN]);
+  if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  const { id } = await params;
+  if (id === session.id) {
+    return NextResponse.json(
+      { error: "Kendi hesabınızı silemezsiniz" },
+      { status: 400 },
+    );
+  }
+
+  const before = await prisma.user.findUnique({
+    where: { id, deletedAt: null },
+    select: { id: true, email: true, active: true },
+  });
+  if (!before) {
+    return NextResponse.json({ error: "Kullanıcı bulunamadı" }, { status: 404 });
+  }
+
+  await prisma.$transaction([
+    prisma.userActivationToken.updateMany({
+      where: { userId: id, usedAt: null },
+      data: { usedAt: new Date() },
+    }),
+    prisma.user.update({
+      where: { id },
+      data: { active: false, deletedAt: new Date() },
+    }),
+  ]);
+
+  await recordAudit({
+    action: AuditAction.ADMIN_CHANGED_USER_STATUS,
+    actor: session,
+    entityType: "User",
+    entityId: id,
+    metadata: {
+      email: before.email,
+      from: before.active,
+      to: false,
+      deleted: true,
+    },
+  });
+
+  return NextResponse.json({ ok: true });
 }

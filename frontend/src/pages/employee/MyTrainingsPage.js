@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api, fmtTime, fmtDate } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { PlayCircle, CheckCircle2, Clock, FileQuestion } from "lucide-react";
+import { PlayCircle, CheckCircle2, Clock, FileQuestion, FileText } from "lucide-react";
 import { MartiBadge } from "@/components/brand/MartiMark";
 import { WaveLine, OceanBanner } from "@/components/brand/Decoration";
 import { HeroBanner } from "@/components/brand/HeroBanner";
@@ -32,13 +32,16 @@ export default function MyTrainingsPage() {
     if (!a) return "";
     const cp = a.checkpoint_count || 0;
     const q = a.quiz_question_count || 0;
+    const content = a.content_type === "pdf" ? "PDF'nin tüm sayfalarını" : "videoyu";
     if (cp > 0 && q > 0)
-      return `Bu eğitimde ${cp} kontrol noktası sorusu bulunmaktadır ve videoyu tamamladığınızda ${q} soruluk bir sınavı tamamlamanız gerekmektedir.`;
+      return `Bu eğitimde ${cp} kontrol noktası sorusu bulunmaktadır ve ${content} tamamladığınızda ${q} soruluk bir sınavı tamamlamanız gerekmektedir.`;
     if (cp > 0)
       return `Bu eğitimde ${cp} kontrol noktası sorusu bulunmaktadır.`;
     if (q > 0)
-      return `Videoyu tamamladığınızda ${q} soruluk bir sınavı tamamlamanız gerekmektedir.`;
-    return "Bu eğitimi tamamlamak için videoyu sonuna kadar izlemeniz gerekmektedir.";
+      return `${content[0].toLocaleUpperCase("tr-TR") + content.slice(1)} tamamladığınızda ${q} soruluk bir sınavı tamamlamanız gerekmektedir.`;
+    return a.content_type === "pdf"
+      ? "Bu eğitimi tamamlamak için PDF'nin tüm sayfalarını sırayla görüntülemeniz gerekmektedir."
+      : "Bu eğitimi tamamlamak için videoyu sonuna kadar izlemeniz gerekmektedir.";
   };
 
   return (
@@ -87,7 +90,7 @@ export default function MyTrainingsPage() {
                   <div className="flex justify-between items-center text-xs text-slate-400 mb-1.5">
                     <span className="flex items-center gap-1.5">
                       <span className={`w-1.5 h-1.5 rounded-full ${done ? "bg-emerald-500" : "bg-cyan-500"}`} />
-                      İzleme ilerlemesi
+                      Eğitim ilerlemesi
                     </span>
                     <span className="tabular-nums font-medium text-slate-600">%{done ? 100 : a.watch_pct}</span>
                   </div>
@@ -99,7 +102,11 @@ export default function MyTrainingsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-400 mt-auto pt-4 border-t border-navy-900/[0.06]">
-                  <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-slate-300" />{fmtTime(a.duration)}</span>
+                  {a.content_type === "pdf" ? (
+                    <span className="flex items-center gap-1.5"><FileText className="w-3.5 h-3.5 text-slate-300" />{a.pdf_page_count} sayfa</span>
+                  ) : (
+                    <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-slate-300" />{fmtTime(a.duration)}</span>
+                  )}
                   {a.has_quiz && <span className="flex items-center gap-1.5"><FileQuestion className="w-3.5 h-3.5 text-slate-300" />Sınav var</span>}
                   {a.due_at && <span className="ml-auto text-slate-400">Son: {fmtDate(a.due_at)}</span>}
                 </div>

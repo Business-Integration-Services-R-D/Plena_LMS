@@ -4,7 +4,7 @@ import { api, fmtDate, fmtTime } from "@/lib/api";
 import { PageHeader } from "@/components/Layout";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Trash2, Video, Film, HelpCircle, Send } from "lucide-react";
+import { Plus, Trash2, Video, Film, HelpCircle, Send, FileText } from "lucide-react";
 import { OceanBanner } from "@/components/brand/Decoration";
 
 const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
@@ -42,7 +42,7 @@ export default function TrainingsPage() {
       <PageHeader
         overline="İçerik"
         title="Eğitimler"
-        subtitle="Video yükleyin, kontrol noktaları yerleştirin ve sınav oluşturun."
+        subtitle="Video veya PDF yükleyin, kontrol noktaları yerleştirin ve sınav oluşturun."
         action={
           <button data-testid="add-training-btn" className={btnPrimary} onClick={() => { setForm({ title: "", description: "" }); setModal(true); }}>
             <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> Eğitim Oluştur</span>
@@ -61,7 +61,7 @@ export default function TrainingsPage() {
             <OceanBanner className="h-16 rounded-none">
               <div className="relative z-10 h-full flex items-center justify-between px-5">
                 <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${t.video_filename ? "bg-white/[0.14] text-cyan-200 ring-1 ring-white/20" : "bg-white/10 text-white/50"}`}>
-                  <Film className="w-4 h-4" />
+                  {t.content_type === "pdf" ? <FileText className="w-4 h-4" /> : <Film className="w-4 h-4" />}
                 </div>
                 <button data-testid={`delete-training-${t.training_id}`} onClick={(e) => remove(t, e)}
                   className="p-1.5 rounded-lg text-white/60 hover:text-red-300 hover:bg-white/10 transition-colors opacity-0 group-hover:opacity-100">
@@ -73,7 +73,10 @@ export default function TrainingsPage() {
               <p className="font-medium text-navy-950 mb-1">{t.title}</p>
               <p className="text-sm text-slate-400 line-clamp-2 mb-5 min-h-[20px]">{t.description || "Açıklama yok"}</p>
               <div className="flex items-center gap-4 text-xs text-slate-400">
-                <span className="flex items-center gap-1.5"><Video className="w-3.5 h-3.5" />{t.video_filename ? fmtTime(t.duration) : "Video yok"}</span>
+                <span className="flex items-center gap-1.5">
+                  {t.content_type === "pdf" ? <FileText className="w-3.5 h-3.5" /> : <Video className="w-3.5 h-3.5" />}
+                  {t.video_filename ? (t.content_type === "pdf" ? `${t.pdf_page_count} sayfa` : fmtTime(t.duration)) : "İçerik yok"}
+                </span>
                 <span className="flex items-center gap-1.5"><HelpCircle className="w-3.5 h-3.5" />{(t.checkpoints || []).length} kontrol</span>
                 <span className="flex items-center gap-1.5"><Send className="w-3.5 h-3.5" />{t.assignment_count} atama</span>
               </div>

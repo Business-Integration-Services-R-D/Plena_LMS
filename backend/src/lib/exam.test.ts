@@ -70,7 +70,7 @@ describe("resolveExamSettings", () => {
 });
 
 describe("checkExamGate", () => {
-  it("video tamamlanmadan testi açmaz", () => {
+  it("eğitim içeriği tamamlanmadan testi açmaz", () => {
     const gate = checkExamGate(
       enrollment({ videoCompleted: false }),
       { maxAttempts: 0 },
@@ -78,10 +78,10 @@ describe("checkExamGate", () => {
     );
 
     expect(gate.allowed).toBe(false);
-    if (!gate.allowed) expect(gate.reason).toContain("Video %100");
+    if (!gate.allowed) expect(gate.reason).toContain("Eğitim içeriği");
   });
 
-  it("video tamamlandıysa testi açar", () => {
+  it("eğitim içeriği tamamlandıysa testi açar", () => {
     expect(checkExamGate(enrollment(), { maxAttempts: 0 }, NOW).allowed).toBe(true);
   });
 

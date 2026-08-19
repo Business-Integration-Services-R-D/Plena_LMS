@@ -79,6 +79,7 @@ enum AuditAction {
   ADMIN_CREATED_USER
   ADMIN_UPDATED_USER
   ADMIN_CHANGED_USER_STATUS
+  ADMIN_SENT_ACTIVATION
   ADMIN_CREATED_COURSE
   ADMIN_UPDATED_COURSE
   ADMIN_CREATED_GROUP
@@ -90,6 +91,13 @@ enum AuditAction {
   ADMIN_EXPORTED_REPORT
   USER_LOGGED_IN
   USER_LOGGED_OUT
+  USER_ACTIVATED_ACCOUNT
+}
+
+enum NotificationKind {
+  WELCOME
+  TRAINING_STARTED
+  DUE_REMINDER
 }
 
 // ---------------------------------------------------------------------------
@@ -97,24 +105,63 @@ enum AuditAction {
 // ---------------------------------------------------------------------------
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   name         String
   passwordHash String
-  role         Role     @default(USER)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role         Role      @default(USER)
+  active       Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  memberships    GroupMember[]
-  assignments    Assignment[]  @relation("AssignmentTargetUser")
-  createdAssigns Assignment[]  @relation("AssignmentCreatedBy")
-  enrollments    Enrollment[]
-  watchEvents    WatchEvent[]
-  quizAttempts   QuizAttempt[]
-  auditLogs      AuditLog[]
+  memberships      GroupMember[]
+  assignments      Assignment[]          @relation("AssignmentTargetUser")
+  createdAssigns   Assignment[]          @relation("AssignmentCreatedBy")
+  enrollments      Enrollment[]
+  watchEvents      WatchEvent[]
+  quizAttempts     QuizAttempt[]
+  auditLogs        AuditLog[]
+  activationTokens UserActivationToken[]
+  notifications    UserNotification[]
 
   @@index([active])
+  @@index([deletedAt])
+}
+
+model UserActivationToken {
+  id             String    @id @default(cuid())
+  userId         String
+  tokenHash      String    @unique
+  codeHash       String
+  expiresAt      DateTime
+  usedAt         DateTime?
+  failedAttempts Int       @default(0)
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+model UserNotification {
+  id         String           @id @default(cuid())
+  userId     String
+  kind       NotificationKind
+  dedupeKey  String
+  title      String
+  body       String
+  link       String?
+  metadata   Json?
+  readAt     DateTime?
+  occurredAt DateTime         @default(now())
+  createdAt  DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt, occurredAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -305,6 +352,8 @@ model Video {
   fileName    String
   contentType String   @default("video/mp4")
   durationSec Int
+  /// PDF içeriklerinde toplam sayfa; videolarda null.
+  pageCount   Int?
   sizeBytes   Int      @default(0)
   createdAt   DateTime @default(now())
 
@@ -329,6 +378,8 @@ model Assignment {
   startsAt     DateTime
   /// Son tamamlama tarihi/saati. Geçilirse durum OVERDUE olur.
   dueAt        DateTime?
+  /// Son N takvim gününde günlük uygulama içi hatırlatma. 0 = kapalı.
+  reminderDays Int       @default(0)
   assignedAt   DateTime  @default(now())
   assignedById String?
 
@@ -358,9 +409,10 @@ model Enrollment {
   status EnrollmentStatus @default(NOT_STARTED)
 
   /// Atamadan kopyalanan görünürlük penceresi.
-  startsAt   DateTime
-  dueAt      DateTime?
-  assignedAt DateTime  @default(now())
+  startsAt     DateTime
+  dueAt        DateTime?
+  reminderDays Int       @default(0)
+  assignedAt   DateTime  @default(now())
 
   /// 8) Kaldığı yerden devam için oynatıcı durumu.
   positionSec     Float   @default(0)
