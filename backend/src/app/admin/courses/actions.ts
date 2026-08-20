@@ -45,10 +45,10 @@ export async function createCourseAction(
     if (!Number.isFinite(passPercent) || passPercent < 0 || passPercent > 100) {
       return { ok: false, error: "Geçme barajı 0-100 arasında olmalı" };
     }
-    if (file.size > 450 * 1024 * 1024) {
+    if (file.size > 1024 * 1024 * 1024) {
       return {
         ok: false,
-        error: "Video çok büyük (max ~450MB). Daha kısa bir dosya deneyin.",
+        error: "Video çok büyük (max 1GB). Daha kısa bir dosya deneyin.",
       };
     }
 

@@ -61,10 +61,10 @@ export async function POST(
     );
   }
 
-  const maxBytes = isPdf ? 50 * 1024 * 1024 : 450 * 1024 * 1024;
+  const maxBytes = isPdf ? 50 * 1024 * 1024 : 1024 * 1024 * 1024;
   if (file.size > maxBytes) {
     return NextResponse.json(
-      { error: isPdf ? "PDF çok büyük (max 50MB)" : "Video çok büyük (max ~450MB)" },
+      { error: isPdf ? "PDF çok büyük (max 50MB)" : "Video çok büyük (max 1GB)" },
       { status: 413 },
     );
   }

@@ -102,7 +102,7 @@ export default function TrainingDetailPage() {
     const isVideoFile = file.name.toLowerCase().endsWith(".mp4") || file.type === "video/mp4";
     if (!isPdfFile && !isVideoFile) return toast.error("Yalnızca MP4 video veya PDF yükleyebilirsiniz");
     if (isPdfFile && file.size > 50 * 1024 * 1024) return toast.error("PDF 50MB sınırını aşıyor");
-    if (isVideoFile && file.size > 250 * 1024 * 1024) return toast.error("Video 250MB sınırını aşıyor");
+    if (isVideoFile && file.size > 1024 * 1024 * 1024) return toast.error("Video 1GB sınırını aşıyor");
 
     let duration = 0;
     let pageCount = 0;
@@ -547,7 +547,7 @@ export default function TrainingDetailPage() {
                 <UploadCloud className="w-6 h-6 text-slate-400" />
               </div>
               <p className="text-sm font-medium text-slate-700">MP4 video veya PDF yükleyin</p>
-              <p className="text-xs text-slate-400">Video 250MB · PDF 50MB</p>
+              <p className="text-xs text-slate-400">Video 1GB · PDF 50MB</p>
             </button>
           )}
           {uploading > 0 && (
