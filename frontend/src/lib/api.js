@@ -27,9 +27,14 @@ export const toUiUser = (u) =>
         name: u.name,
         role: toUiRole(u.role),
         picture: u.picture || null,
+        account_active: u.active !== false,
+        can_manage_status:
+          u.active !== false || Boolean(u.deactivatedAt),
         status:
           u.active !== false
             ? "active"
+            : u.deactivatedAt
+              ? "passive"
             : u.activationSent
               ? "invited"
               : "pending_activation",
@@ -640,6 +645,14 @@ const routes = [
     handler: async (m) => {
       await http.delete(`/admin/users/${m[1]}`);
       return { ok: true };
+    },
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/users\/([^/]+)$/,
+    handler: async (m, body) => {
+      const res = await http.patch(`/admin/users/${m[1]}`, body);
+      return toUiUser(res.data);
     },
   },
   {

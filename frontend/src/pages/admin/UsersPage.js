@@ -1,14 +1,45 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, fmtDate } from "@/lib/api";
 import { PageHeader } from "@/components/Layout";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 import { Plus, Mail, Trash2, Users as UsersIcon, Pencil } from "lucide-react";
 
 const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
 const btnPrimary = "px-5 py-2.5 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow] disabled:opacity-40";
+const userStatusMeta = {
+  active: {
+    label: "Aktif",
+    className: "bg-emerald-50 text-emerald-600",
+  },
+  passive: {
+    label: "Pasif",
+    className: "bg-red-50 text-red-600",
+  },
+  invited: {
+    label: "Davet Edildi",
+    className: "bg-amber-50 text-amber-600",
+  },
+  pending_activation: {
+    label: "Aktivasyon Gönderilmedi",
+    className: "bg-slate-100 text-slate-600",
+  },
+};
 
 export default function UsersPage() {
+  const { user: currentUser } = useAuth();
   const [tab, setTab] = useState("users");
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -17,6 +48,8 @@ export default function UsersPage() {
   const [form, setForm] = useState({ email: "", name: "", role: "employee" });
   const [userSubmitting, setUserSubmitting] = useState(false);
   const [groupForm, setGroupForm] = useState({ name: "", member_ids: [] });
+  const [statusUpdating, setStatusUpdating] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const load = useCallback(() => {
     api.get("/users").then((r) => setUsers(r.data));
@@ -43,11 +76,25 @@ export default function UsersPage() {
     }
   };
 
-  const deleteUser = async (u) => {
-    if (!window.confirm(`${u.name} silinsin mi?`)) return;
+  const toggleUserStatus = async (u, active) => {
+    setStatusUpdating(u.user_id);
     try {
-      await api.delete(`/users/${u.user_id}`);
-      toast.success("Kullanıcı silindi");
+      await api.patch(`/users/${u.user_id}`, { active });
+      toast.success(active ? "Kullanıcı aktifleştirildi" : "Kullanıcı pasife alındı");
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Kullanıcı durumu güncellenemedi");
+    } finally {
+      setStatusUpdating(null);
+    }
+  };
+
+  const deleteUser = async () => {
+    if (!deleteTarget) return;
+    try {
+      await api.delete(`/users/${deleteTarget.user_id}`);
+      toast.success("Kullanıcı silindi; geçmiş kayıtları korundu");
+      setDeleteTarget(null);
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Silinemedi");
@@ -154,33 +201,40 @@ export default function UsersPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                      u.status === "active"
-                        ? "bg-emerald-50 text-emerald-600"
-                        : u.status === "invited"
-                          ? "bg-amber-50 text-amber-600"
-                          : "bg-slate-100 text-slate-600"
-                    }`}>
-                      {u.status === "active"
-                        ? "Aktif"
-                        : u.status === "invited"
-                          ? "Davet Edildi"
-                          : "Aktivasyon Gönderilmedi"}
+                    <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${userStatusMeta[u.status]?.className || userStatusMeta.pending_activation.className}`}>
+                      {userStatusMeta[u.status]?.label || userStatusMeta.pending_activation.label}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-slate-400">{fmtDate(u.created_at)}</td>
                   <td className="px-6 py-4">
-                    <div className="flex justify-end gap-1">
-                      {u.status !== "active" && (
+                    <div className="flex items-center justify-end gap-2">
+                      {u.can_manage_status && (
+                        <label className="flex items-center gap-2 mr-1 text-xs text-slate-500">
+                          <Switch
+                            data-testid={`toggle-user-${u.email}`}
+                            checked={u.account_active}
+                            disabled={
+                              statusUpdating === u.user_id ||
+                              currentUser?.user_id === u.user_id
+                            }
+                            onCheckedChange={(active) => toggleUserStatus(u, active)}
+                            aria-label={`${u.name} kullanıcısını ${u.account_active ? "pasife al" : "aktifleştir"}`}
+                          />
+                          <span>{u.account_active ? "Aktif" : "Pasif"}</span>
+                        </label>
+                      )}
+                      {(u.status === "invited" || u.status === "pending_activation") && (
                         <button data-testid={`resend-activation-${u.email}`} onClick={() => resend(u)} title={u.status === "invited" ? "Aktivasyonu tekrar gönder" : "Aktivasyon gönder"}
                           className="p-2 rounded-lg text-slate-400 hover:text-brand-600 hover:bg-brand-50 transition-colors">
                           <Mail className="w-4 h-4" />
                         </button>
                       )}
-                      <button data-testid={`delete-user-${u.email}`} onClick={() => deleteUser(u)} title="Sil"
-                        className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {currentUser?.user_id !== u.user_id && (
+                        <button data-testid={`delete-user-${u.email}`} onClick={() => setDeleteTarget(u)} title="Sil"
+                          className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -248,6 +302,32 @@ export default function UsersPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kullanıcı silinsin mi?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{deleteTarget?.name}</strong> kullanıcı listesinden kaldırılacak ve
+              artık giriş yapamayacak. Eğitim ilerlemesi, sınav sonuçları, izleme
+              geçmişi ve kullanıcı bilgileri raporlar için korunacak.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="confirm-delete-user"
+              onClick={deleteUser}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              Kullanıcıyı Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={!!groupModal} onOpenChange={(o) => !o && setGroupModal(null)}>
         <DialogContent className="rounded-2xl">

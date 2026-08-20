@@ -75,6 +75,6 @@ export async function requireSession(roles?: Role[]) {
   if (!session) return null;
   if (roles && !roles.includes(session.role)) return null;
   const user = await prisma.user.findUnique({ where: { id: session.id } });
-  if (!user || !user.active) return null;
+  if (!user || !user.active || user.deletedAt) return null;
   return session;
 }

@@ -25,6 +25,7 @@ export async function GET() {
       name: true,
       role: true,
       active: true,
+      deactivatedAt: true,
       createdAt: true,
       activationTokens: {
         select: { id: true },

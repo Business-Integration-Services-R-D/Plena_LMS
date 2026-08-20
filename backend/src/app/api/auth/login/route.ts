@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const user = await prisma.user.findUnique({
     where: { email: parsed.data.email.toLowerCase() },
   });
-  if (!user || !user.active) {
+  if (!user || !user.active || user.deletedAt) {
     return NextResponse.json({ error: "E-posta veya şifre hatalı" }, { status: 401 });
   }
 

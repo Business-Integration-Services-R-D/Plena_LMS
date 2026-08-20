@@ -115,7 +115,7 @@ export default function AssignmentsPage() {
             <div>
               <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">Kullanıcılar</p>
               <div className="max-h-40 overflow-y-auto border border-navy-900/5 rounded-xl divide-y divide-navy-900/5">
-                {users.filter((u) => u.role === "employee").map((u) => (
+                {users.filter((u) => u.role === "employee" && u.account_active).map((u) => (
                   <label key={u.user_id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-slate-50">
                     <input type="checkbox" data-testid={`assign-user-${u.email}`} checked={form.user_ids.includes(u.user_id)} onChange={() => toggle("user_ids", u.user_id)} className="accent-navy-900" />
                     <span className="text-sm text-slate-700">{u.name}</span>
