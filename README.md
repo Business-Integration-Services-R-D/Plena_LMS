@@ -4,16 +4,24 @@ Tek repo, iki katman:
 
 - `frontend/` — Plena arayüzü (CRA, http://localhost:3000). Kullanıcıların gördüğü tek arayüz budur.
 - `backend/` — LMS backend'i (Next.js API + Prisma + PostgreSQL, http://localhost:3001). Sadece API olarak kullanılır; kendi sayfaları artık kullanılmaz.
-- `docs/` — proje dokümanları (PRD, yönerge, sunum, tasarım notları).
+- `docs/` — proje dokümanları (PRD, yönerge ve tasarım notları).
 
 `frontend/src/lib/api.js`, arayüzün beklediği eski FastAPI sözleşmesini backend API'sine çeviren adapter'dır.
+
+## Güncel özellikler
+
+- MP4 (en fazla 1 GB) ve PDF (en fazla 50 MB) eğitim içerikleri
+- Video ileri sarma engeli ve PDF'de sıralı sayfa ilerlemesi
+- Kontrol noktaları, sınavlar ve serbest metin cevapları
+- Kullanıcı aktivasyonu, aktif/pasif hesap yönetimi ve grup atamaları
+- Eğitim ve kişi bazlı ekran, PDF ve Excel raporları
 
 ## İlk kurulum
 
 Repoyu ilk defa kuran biri için tek komut yeterlidir (macOS Apple Silicon):
 
 ```bash
-git clone https://github.com/aslinuralkan/Plena_LMS.git
+git clone https://github.com/Business-Integration-Services-R-D/Plena_LMS.git
 cd Plena_LMS
 ./setup.sh
 ```
@@ -51,5 +59,6 @@ npm run db:setup   # prisma db push + demo verisi
 ## Notlar
 
 - Ortam dosyaları gitignore'dadır; şablonları repodadır: `frontend/.env.example` ve `backend/.env.example`. `./setup.sh` bunlardan gerçek `.env` dosyalarını üretir.
-- Yüklenen videolar `backend/storage/videos/` altında, veritabanı verisi `.tools/pg/data/` altında tutulur; ikisi de gitignore'dadır.
+- Lokal modda yüklenen eğitim içerikleri `backend/storage/videos/` altında, veritabanı verisi `.tools/pg/data/` altında tutulur; ikisi de gitignore'dadır.
+- Production adresi `https://lms.bislabs.tech`; dosyalar private S3 bucket'ta, veritabanı private RDS üzerinde tutulur.
 - `backend/docker-compose.yml` Postgres + MinIO + Caddy ile konteynerli kurulum içindir (lokal geliştirmede kullanılmaz).

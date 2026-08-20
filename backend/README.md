@@ -17,9 +17,17 @@ PostgreSQL, repo kökündeki gömülü kurulumdan çalışır (`.tools/pg`). Ba�
 ## Önemli dizinler
 
 - `src/app/api/` — REST endpoint'leri (auth, admin, user)
-- `src/lib/` — domain kuralları (izleme penceresi, sınav, ilerleme, depolama)
+- `src/lib/` — domain kuralları (video/PDF ilerlemesi, sınav, aktivasyon, depolama)
 - `prisma/` — şema, migration'lar ve seed
-- `storage/videos/` — yüklenen videolar (gitignore)
+- `storage/videos/` — lokal modda yüklenen MP4/PDF içerikleri (gitignore)
+
+## İçerik sınırları
+
+- MP4 video: en fazla 1 GB
+- PDF: en fazla 50 MB
+
+Production ortamında içerikler private S3 bucket'a yüklenir; lokal geliştirmede
+`STORAGE_DRIVER=local` kullanılır.
 
 ## Testler
 
