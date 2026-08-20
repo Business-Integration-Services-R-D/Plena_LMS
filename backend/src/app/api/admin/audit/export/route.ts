@@ -232,6 +232,13 @@ export async function GET(req: NextRequest) {
     watchEvents[0]?.course.title ??
     quizAttempts[0]?.course.title ??
     (courseId ? "Seçili eğitim" : "Tüm eğitimler");
+  const userName =
+    enrollments[0]?.user.name ??
+    watchEvents[0]?.user.name ??
+    quizAttempts[0]?.user.name ??
+    (userId ? "Seçili kullanıcı" : null);
+  const reportScope = userId ? userName! : courseTitle;
+  const reportTitle = userId ? "Kişi Bazlı Rapor" : "Eğitim Detay Raporu";
   const completedCount = enrollments.filter((item) => item.status === "COMPLETED").length;
   const averageProgress =
     enrollments.length > 0
@@ -251,7 +258,7 @@ export async function GET(req: NextRequest) {
     { width: 4 },
   ];
   summarySheet.mergeCells("A1:F1");
-  summarySheet.getCell("A1").value = "Eğitim Detay Raporu";
+  summarySheet.getCell("A1").value = reportTitle;
   summarySheet.getCell("A1").font = {
     bold: true,
     size: 20,
@@ -265,7 +272,7 @@ export async function GET(req: NextRequest) {
   summarySheet.getCell("A1").alignment = { vertical: "middle", horizontal: "left" };
   summarySheet.getRow(1).height = 42;
   summarySheet.addRow([]);
-  summarySheet.addRow(["Rapor kapsamı", courseTitle, "", "Oluşturulma zamanı", excelDate(new Date())]);
+  summarySheet.addRow(["Rapor kapsamı", reportScope, "", "Oluşturulma zamanı", excelDate(new Date())]);
   summarySheet.addRow(["Toplam atama", enrollments.length, "", "Tamamlanan", completedCount]);
   summarySheet.addRow([
     "Tamamlanma oranı",
@@ -275,8 +282,10 @@ export async function GET(req: NextRequest) {
     averageProgress / 100,
   ]);
   summarySheet.addRow([
-    "Tekil kullanıcı",
-    new Set(enrollments.map((item) => item.userId)).size,
+    userId ? "Tekil eğitim" : "Tekil kullanıcı",
+    userId
+      ? new Set(enrollments.map((item) => item.courseId)).size
+      : new Set(enrollments.map((item) => item.userId)).size,
     "",
     "Sınav denemesi",
     quizAttempts.length,
@@ -427,9 +436,9 @@ export async function GET(req: NextRequest) {
   auditSheet.getColumn("time").numFmt = DATE_NUMBER_FORMAT;
   styleTable(auditSheet);
 
-  workbook.title = `${courseTitle} - Eğitim Detay Raporu`;
+  workbook.title = `${reportScope} - ${reportTitle}`;
   workbook.subject = "Eğitim ilerleme, izleme ve sınav sonuçları";
-  const safeCourseName = courseTitle
+  const safeReportName = reportScope
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[ıİ]/g, "i")
@@ -451,7 +460,7 @@ export async function GET(req: NextRequest) {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="egitim-raporu-${safeCourseName}-${reportDate}.xlsx"`,
+      "Content-Disposition": `attachment; filename="${userId ? "kisi" : "egitim"}-raporu-${safeReportName}-${reportDate}.xlsx"`,
     },
   });
 }

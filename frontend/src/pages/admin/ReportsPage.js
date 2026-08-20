@@ -18,6 +18,8 @@ const EVENT_TR = {
 export default function ReportsPage() {
   const [overview, setOverview] = useState(null);
   const [trainings, setTrainings] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [reportMode, setReportMode] = useState("training");
   const [selected, setSelected] = useState("");
   const [report, setReport] = useState(null);
   const [freeText, setFreeText] = useState([]);
@@ -27,15 +29,19 @@ export default function ReportsPage() {
   const exportReport = async (fmt) => {
     setExporting(fmt);
     try {
-      const res = await api.get(`/reports/trainings/${selected}/export`, { params: { fmt }, responseType: "blob" });
+      const scope = reportMode === "person" ? "users" : "trainings";
+      const res = await api.get(`/reports/${scope}/${selected}/export`, { params: { fmt }, responseType: "blob" });
       const cd = res.headers["content-disposition"] || "";
-      const filename = cd.match(/filename="?([^";]+)"?/)?.[1] || `rapor.${fmt === "excel" ? "xlsx" : "pdf"}`;
+      const fallbackName = reportMode === "person" ? "kisi-raporu" : "egitim-raporu";
+      const filename = cd.match(/filename="?([^";]+)"?/)?.[1] || `${fallbackName}.${fmt === "excel" ? "xlsx" : "pdf"}`;
       const url = URL.createObjectURL(res.data);
       const a = document.createElement("a");
       a.href = url;
       a.download = filename;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success(fmt === "excel" ? "Excel raporu indirildi" : "PDF raporu indirildi");
     } catch {
       toast.error("Rapor indirilemedi");
@@ -47,19 +53,38 @@ export default function ReportsPage() {
   useEffect(() => {
     api.get("/reports/overview").then((r) => setOverview(r.data));
     api.get("/trainings").then((r) => setTrainings(r.data));
+    api.get("/users").then((r) => setUsers(r.data.filter((user) => user.role === "employee")));
   }, []);
 
   useEffect(() => {
-    if (selected) api.get(`/reports/trainings/${selected}`).then((r) => setReport(r.data));
+    if (selected) {
+      const scope = reportMode === "person" ? "users" : "trainings";
+      api.get(`/reports/${scope}/${selected}`).then((r) => setReport(r.data));
+    }
     else setReport(null);
-  }, [selected]);
+  }, [reportMode, selected]);
 
   useEffect(() => {
+    const params =
+      reportMode === "person"
+        ? selected
+          ? { user_id: selected }
+          : {}
+        : selected
+          ? { training_id: selected }
+          : {};
     api
-      .get("/reports/free-text", { params: selected ? { training_id: selected } : {} })
+      .get("/reports/free-text", { params })
       .then((r) => setFreeText(r.data))
       .catch(() => setFreeText([]));
-  }, [selected]);
+  }, [reportMode, selected]);
+
+  const changeReportMode = (mode) => {
+    setReportMode(mode);
+    setSelected("");
+    setReport(null);
+    setFreeText([]);
+  };
 
   const openDetail = async (row) => {
     const res = await api.get(`/reports/assignments/${row.assignment_id}/detail`);
@@ -89,11 +114,46 @@ export default function ReportsPage() {
 
       <div className="n-card p-8">
         <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
-          <h2 className="text-lg font-medium tracking-tight text-navy-950">Eğitim Detay Raporu</h2>
+          <div>
+            <h2 className="text-lg font-medium tracking-tight text-navy-950">
+              {reportMode === "person" ? "Kişi Bazlı Rapor" : "Eğitim Detay Raporu"}
+            </h2>
+            <div className="flex gap-1 bg-slate-100 rounded-full p-1 w-fit mt-3">
+              <button
+                data-testid="report-mode-training"
+                onClick={() => changeReportMode("training")}
+                className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${reportMode === "training" ? "bg-white shadow-sm text-navy-950" : "text-slate-500"}`}
+              >
+                Eğitim Bazlı
+              </button>
+              <button
+                data-testid="report-mode-person"
+                onClick={() => changeReportMode("person")}
+                className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${reportMode === "person" ? "bg-white shadow-sm text-navy-950" : "text-slate-500"}`}
+              >
+                Kişi Bazlı
+              </button>
+            </div>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <select data-testid="report-training-select" className={inputCls} value={selected} onChange={(e) => setSelected(e.target.value)}>
-              <option value="">Eğitim seçin...</option>
-              {trainings.map((t) => <option key={t.training_id} value={t.training_id}>{t.title}</option>)}
+            <select
+              data-testid={reportMode === "person" ? "report-person-select" : "report-training-select"}
+              className={inputCls}
+              value={selected}
+              onChange={(e) => setSelected(e.target.value)}
+            >
+              <option value="">{reportMode === "person" ? "Kişi seçin..." : "Eğitim seçin..."}</option>
+              {reportMode === "person"
+                ? users.map((user) => (
+                    <option key={user.user_id} value={user.user_id}>
+                      {user.name} · {user.email}
+                    </option>
+                  ))
+                : trainings.map((training) => (
+                    <option key={training.training_id} value={training.training_id}>
+                      {training.title}
+                    </option>
+                  ))}
             </select>
             {selected && (
               <>
@@ -117,13 +177,19 @@ export default function ReportsPage() {
             )}
           </div>
         </div>
-        {!report && <p className="text-sm text-slate-400">Rapor görüntülemek için bir eğitim seçin.</p>}
+        {!report && (
+          <p className="text-sm text-slate-400">
+            Rapor görüntülemek için {reportMode === "person" ? "bir kişi" : "bir eğitim"} seçin.
+          </p>
+        )}
         {report && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b n-hairline bg-[#F5F8FA]">
-                  <th className="px-4 py-3 font-medium">Kullanıcı</th>
+                  <th className="px-4 py-3 font-medium">
+                    {reportMode === "person" ? "Eğitim" : "Kullanıcı"}
+                  </th>
                   <th className="px-4 py-3 font-medium">Durum</th>
                   <th className="px-4 py-3 font-medium">İzleme</th>
                   <th className="px-4 py-3 font-medium">İzleme Süresi</th>
@@ -136,10 +202,16 @@ export default function ReportsPage() {
               </thead>
               <tbody>
                 {report.rows.map((r) => (
-                  <tr key={r.assignment_id} className="border-b border-navy-900/5 last:border-0 hover:bg-slate-50/60" data-testid={`report-row-${r.user_email}`}>
+                  <tr key={r.assignment_id} className="border-b border-navy-900/5 last:border-0 hover:bg-slate-50/60" data-testid={`report-row-${reportMode === "person" ? r.training_id : r.user_email}`}>
                     <td className="px-4 py-3.5">
-                      <p className="font-medium text-navy-950">{r.user_name}</p>
-                      <p className="text-xs text-slate-400">{r.user_email}</p>
+                      <p className="font-medium text-navy-950">
+                        {reportMode === "person" ? r.training_title : r.user_name}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {reportMode === "person"
+                          ? r.training_category || "Kategorisiz"
+                          : r.user_email}
+                      </p>
                     </td>
                     <td className="px-4 py-3.5"><span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_COLOR[r.status]}`}>{STATUS_TR[r.status]}</span></td>
                     <td className="px-4 py-3.5">
@@ -173,7 +245,11 @@ export default function ReportsPage() {
           <h2 className="text-lg font-medium tracking-tight text-navy-950 mb-1">Serbest Metin Cevapları</h2>
           <p className="text-sm text-slate-400">
             Doğru cevabı olmayan sorular; puanlamaya girmez, değerlendirmek için okunur.
-            {selected ? " Seçili eğitim için listelenir." : " Tüm eğitimler listelenir."}
+            {selected
+              ? reportMode === "person"
+                ? " Seçili kişinin tüm eğitimleri için listelenir."
+                : " Seçili eğitim için listelenir."
+              : " Tüm eğitimler listelenir."}
           </p>
         </div>
         {freeText.length === 0 ? (
@@ -188,7 +264,9 @@ export default function ReportsPage() {
                   <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-white border border-navy-900/10 text-slate-600">
                     {a.source === "checkpoint" ? `Kontrol noktası · ${fmtTime(a.position || 0)}` : `Sınav · ${a.attempt_no}. deneme`}
                   </span>
-                  {!selected && a.training_title && <span className="text-xs text-slate-400">{a.training_title}</span>}
+                  {(reportMode === "person" || !selected) && a.training_title && (
+                    <span className="text-xs text-slate-400">{a.training_title}</span>
+                  )}
                   <span className="text-xs text-slate-400 ml-auto">{fmtDate(a.answered_at)}</span>
                 </div>
                 <p className="text-sm text-slate-700 mb-1">{a.question_text}</p>

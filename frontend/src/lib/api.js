@@ -50,6 +50,23 @@ const toUiStatus = (status, videoCompleted) => {
   return "in_progress"; // IN_PROGRESS, FAILED (video sıfırlanmış), OVERDUE
 };
 
+const mapReportRow = (r) => ({
+  assignment_id: r.enrollmentId,
+  user_name: r.user?.name,
+  user_email: r.user?.email,
+  training_id: r.course?.id,
+  training_title: r.course?.title,
+  training_category: r.course?.category?.name || null,
+  status: toUiStatus(r.status, r.videoCompleted),
+  watch_pct: Math.round(r.watchedPercent || 0),
+  watched_seconds: r.totalWatchedSec || 0,
+  checkpoints_passed: r.checkpointsPassed || 0,
+  checkpoints_total: r.checkpointsTotal || 0,
+  checkpoint_fails: r.checkpointFails || 0,
+  quiz_score: r.bestScorePercent != null ? Math.round(r.bestScorePercent) : null,
+  completed_at: r.completedAt,
+});
+
 // Kurs başına learn oturumu bilgisi: video süresi, quiz varlığı ve
 // answer_index -> choiceId çevirisi için soru/şık haritası.
 const learnCache = new Map();
@@ -268,7 +285,7 @@ const syncQuiz = async (courseId, quiz) => {
 // için pdfmake'in gömülü Roboto fontu kullanılır)
 // ---------------------------------------------------------------------------
 
-const buildReportPdf = async (courseTitle, rows) => {
+const buildReportPdf = async (reportTitle, rows, dimension = "training") => {
   const [{ default: pdfMake }, fontsModule] = await Promise.all([
     import("pdfmake/build/pdfmake"),
     import("pdfmake/build/vfs_fonts"),
@@ -324,9 +341,10 @@ const buildReportPdf = async (courseTitle, rows) => {
     timeStyle: "medium",
   }).format(new Date());
 
+  const isPersonReport = dimension === "person";
   const header = [
-    "Kullanıcı",
-    "E-posta",
+    isPersonReport ? "Eğitim" : "Kullanıcı",
+    isPersonReport ? "Kategori" : "E-posta",
     "Durum",
     "İlerleme",
     "İçerikte Geçen Süre",
@@ -368,8 +386,19 @@ const buildReportPdf = async (courseTitle, rows) => {
               .join("\n")
           : "Sınava girilmedi";
       return [
-        { ...common, text: r.user?.name || "-", bold: true, color: "#0E2033" },
-        { ...common, text: r.user?.email || "-", fontSize: 7.5 },
+        {
+          ...common,
+          text: isPersonReport ? r.course?.title || "-" : r.user?.name || "-",
+          bold: true,
+          color: "#0E2033",
+        },
+        {
+          ...common,
+          text: isPersonReport
+            ? r.course?.category?.name || "-"
+            : r.user?.email || "-",
+          fontSize: 7.5,
+        },
         {
           text: appearance.label,
           bold: true,
@@ -410,7 +439,7 @@ const buildReportPdf = async (courseTitle, rows) => {
     pageOrientation: "landscape",
     pageMargins: [30, 58, 30, 38],
     info: {
-      title: `${courseTitle} - Eğitim Detay Raporu`,
+      title: `${reportTitle} - ${isPersonReport ? "Kişi Bazlı Rapor" : "Eğitim Detay Raporu"}`,
       author: "Martı Denizcilik · Plena LMS",
       subject: "Eğitim ilerleme ve sınav sonuçları",
     },
@@ -433,7 +462,7 @@ const buildReportPdf = async (courseTitle, rows) => {
     },
     content: [
       {
-        text: "EĞİTİM DETAY RAPORU",
+        text: isPersonReport ? "KİŞİ BAZLI RAPOR" : "EĞİTİM DETAY RAPORU",
         fontSize: 9,
         bold: true,
         color: "#0891B2",
@@ -441,7 +470,7 @@ const buildReportPdf = async (courseTitle, rows) => {
         margin: [0, 0, 0, 4],
       },
       {
-        text: courseTitle,
+        text: reportTitle,
         fontSize: 19,
         bold: true,
         color: "#0E2033",
@@ -936,6 +965,50 @@ const routes = [
   // --- Admin: raporlar ---
   {
     method: "GET",
+    pattern: /^\/reports\/users\/([^/]+)\/export$/,
+    raw: true,
+    handler: async (m, _b, _q, config) => {
+      const userId = m[1];
+      const fmt = config?.params?.fmt;
+      if (fmt === "pdf") {
+        const [reportRes, usersRes] = await Promise.all([
+          http.get("/admin/reports", { params: { userId } }),
+          http.get("/admin/users"),
+        ]);
+        const user = usersRes.data.find((item) => item.id === userId);
+        const userName = user?.name || "Kullanıcı";
+        const blob = await buildReportPdf(userName, reportRes.data.rows, "person");
+        const safeName = userName
+          .toLowerCase()
+          .replace(/[^a-z0-9çğıöşü]+/gi, "-")
+          .replace(/^-+|-+$/g, "");
+        return {
+          data: blob,
+          headers: {
+            "content-disposition": `attachment; filename="kisi-raporu-${safeName || "kullanici"}.pdf"`,
+          },
+        };
+      }
+      return http.get("/admin/audit/export", {
+        params: { format: "xlsx", userId },
+        responseType: "blob",
+      });
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/reports\/users\/([^/]+)$/,
+    handler: async (m) => {
+      const userId = m[1];
+      const res = await http.get("/admin/reports", { params: { userId } });
+      return {
+        user: { user_id: userId },
+        rows: res.data.rows.map(mapReportRow),
+      };
+    },
+  },
+  {
+    method: "GET",
     pattern: /^\/reports\/trainings\/([^/]+)\/export$/,
     raw: true,
     handler: async (m, _b, _q, config) => {
@@ -972,19 +1045,7 @@ const routes = [
       const res = await http.get("/admin/reports", { params: { courseId } });
       return {
         training: { training_id: courseId },
-        rows: res.data.rows.map((r) => ({
-          assignment_id: r.enrollmentId,
-          user_name: r.user?.name,
-          user_email: r.user?.email,
-          status: toUiStatus(r.status, r.videoCompleted),
-          watch_pct: Math.round(r.watchedPercent || 0),
-          watched_seconds: r.totalWatchedSec || 0,
-          checkpoints_passed: r.checkpointsPassed || 0,
-          checkpoints_total: r.checkpointsTotal || 0,
-          checkpoint_fails: r.checkpointFails || 0,
-          quiz_score: r.bestScorePercent != null ? Math.round(r.bestScorePercent) : null,
-          completed_at: r.completedAt,
-        })),
+        rows: res.data.rows.map(mapReportRow),
       };
     },
   },
@@ -993,8 +1054,12 @@ const routes = [
     pattern: /^\/reports\/free-text$/,
     handler: async (_m, _b, query, config) => {
       const courseId = config?.params?.training_id || query?.get("training_id");
+      const userId = config?.params?.user_id || query?.get("user_id");
       const res = await http.get("/admin/reports/free-text", {
-        params: courseId ? { courseId } : {},
+        params: {
+          ...(courseId ? { courseId } : {}),
+          ...(userId ? { userId } : {}),
+        },
       });
       return res.data.rows.map((r) => ({
         id: r.id,

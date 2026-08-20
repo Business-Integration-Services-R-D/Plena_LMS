@@ -16,13 +16,15 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const courseId = searchParams.get("courseId") || undefined;
+  const userId = searchParams.get("userId") || undefined;
 
-  const enrollmentWhere: Prisma.EnrollmentWhereInput = { courseId };
+  const enrollmentWhere: Prisma.EnrollmentWhereInput = { courseId, userId };
 
   const [cpEvents, quizAnswers] = await Promise.all([
     prisma.watchEvent.findMany({
       where: {
         courseId,
+        userId,
         eventType: {
           in: [WatchEventType.CHECKPOINT_PASSED, WatchEventType.CHECKPOINT_FAILED],
         },
