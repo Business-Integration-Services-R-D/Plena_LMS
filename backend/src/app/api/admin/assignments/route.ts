@@ -44,7 +44,7 @@ const schema = z
     target: z.nativeEnum(AssignmentTarget),
     userId: z.string().min(1).optional(),
     groupId: z.string().min(1).optional(),
-    startsAt: z.string().min(1),
+    startsAt: z.string().min(1).optional().nullable(),
     dueAt: z.string().optional().nullable(),
     reminderDays: z.number().int().min(0).max(365).default(0),
   })
@@ -72,14 +72,34 @@ export async function POST(req: NextRequest) {
   const userId = target === "USER" ? parsed.data.userId! : null;
   const groupId = target === "GROUP" ? parsed.data.groupId! : null;
 
-  const startsAtDate = new Date(startsAt);
+  const startsAtDate = startsAt ? new Date(startsAt) : new Date();
   const dueAtDate = dueAt ? new Date(dueAt) : null;
+  const currentMinute = new Date();
+  currentMinute.setSeconds(0, 0);
 
-  if (Number.isNaN(startsAtDate.getTime())) {
+  if (
+    Number.isNaN(startsAtDate.getTime()) ||
+    (startsAt && !/^\d{4}-/.test(startsAt))
+  ) {
     return NextResponse.json({ error: "Başlangıç tarihi geçersiz" }, { status: 400 });
   }
-  if (dueAtDate && Number.isNaN(dueAtDate.getTime())) {
+  if (startsAt && startsAtDate < currentMinute) {
+    return NextResponse.json(
+      { error: "Başlangıç tarihi geçmişte olamaz" },
+      { status: 400 },
+    );
+  }
+  if (
+    dueAtDate &&
+    (Number.isNaN(dueAtDate.getTime()) || !/^\d{4}-/.test(dueAt!))
+  ) {
     return NextResponse.json({ error: "Bitiş tarihi geçersiz" }, { status: 400 });
+  }
+  if (dueAtDate && dueAtDate < currentMinute) {
+    return NextResponse.json(
+      { error: "Bitiş tarihi geçmişte olamaz" },
+      { status: 400 },
+    );
   }
   if (dueAtDate && dueAtDate <= startsAtDate) {
     return NextResponse.json(

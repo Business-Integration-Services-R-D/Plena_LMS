@@ -127,13 +127,14 @@ const mapCourse = (c) => ({
   created_at: c.createdAt,
 });
 
-const mapBankQuestion = (q, poolName) => ({
+const mapBankQuestion = (q) => ({
   question_id: q.id,
   text: q.prompt,
   qtype: q.type === "FREE_TEXT" ? "free_text" : "multiple_choice",
   options: (q.choices || []).map((c) => c.text),
   correct_index: q.type === "FREE_TEXT" ? null : (q.choices || []).findIndex((c) => c.isCorrect),
-  category: poolName || null,
+  category_id: q.questionCategory?.id || q.categoryId || null,
+  category: q.questionCategory?.name || null,
   created_at: q.createdAt,
 });
 
@@ -250,6 +251,7 @@ const syncQuiz = async (courseId, quiz) => {
       if (!existing) {
         await http.post(`/admin/pools/${coursePool.id}/questions`, {
           prompt: q.prompt,
+          categoryId: q.categoryId,
           type: q.type || "MULTIPLE_CHOICE",
           points,
           choices: (q.choices || []).map((ch) => ({ text: ch.text, isCorrect: ch.isCorrect })),
@@ -587,6 +589,62 @@ const routes = [
     },
   },
   {
+    method: "POST",
+    pattern: /^\/auth\/forgot-password$/,
+    handler: async (_m, body) => {
+      const res = await http.post("/auth/forgot-password", body);
+      return res.data;
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/auth\/reset-password$/,
+    handler: async (_m, _body, query) => {
+      const res = await http.get("/auth/reset-password", {
+        params: { token: query.get("token") },
+      });
+      return res.data;
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/auth\/reset-password$/,
+    handler: async (_m, body) => {
+      const res = await http.post("/auth/reset-password", body);
+      return res.data;
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/profile$/,
+    handler: async () => {
+      const res = await http.get("/user/profile");
+      return toUiUser(res.data);
+    },
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/profile$/,
+    handler: async (_m, body) => {
+      const res = await http.patch("/user/profile", {
+        name: body.name,
+      });
+      return toUiUser(res.data);
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/profile\/change-password$/,
+    handler: async (_m, body) => {
+      const res = await http.post("/user/change-password", {
+        currentPassword: body.current_password,
+        newPassword: body.new_password,
+        newPasswordConfirmation: body.new_password_confirmation,
+      });
+      return res.data;
+    },
+  },
+  {
     method: "GET",
     pattern: /^\/auth\/activate$/,
     handler: async (_m, _body, query) => {
@@ -845,10 +903,37 @@ const routes = [
   // --- Admin: soru bankası ---
   {
     method: "GET",
+    pattern: /^\/question-categories$/,
+    handler: async () => (await http.get("/admin/question-categories")).data,
+  },
+  {
+    method: "POST",
+    pattern: /^\/question-categories$/,
+    handler: async (_m, body) =>
+      (await http.post("/admin/question-categories", body)).data,
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/question-categories\/([^/]+)$/,
+    handler: async (m, body) =>
+      (await http.patch(`/admin/question-categories/${m[1]}`, body)).data,
+  },
+  {
+    method: "DELETE",
+    pattern: /^\/question-categories\/([^/]+)$/,
+    handler: async (m, _body, query) =>
+      (
+        await http.delete(`/admin/question-categories/${m[1]}`, {
+          params: { mode: query.get("mode") },
+        })
+      ).data,
+  },
+  {
+    method: "GET",
     pattern: /^\/questions$/,
     handler: async () => {
       const pools = (await http.get("/admin/pools")).data;
-      return fetchQuestionBank(pools).map((q) => mapBankQuestion(q, q._poolName));
+      return fetchQuestionBank(pools).map((q) => mapBankQuestion(q));
     },
   },
   {
@@ -859,10 +944,29 @@ const routes = [
       const poolId = await ensureDefaultPool(pools);
       const res = await http.post(`/admin/pools/${poolId}/questions`, {
         prompt: body.text,
+        ...(body.category_id ? { categoryId: body.category_id } : {}),
         type: body.qtype === "free_text" ? "FREE_TEXT" : "MULTIPLE_CHOICE",
         choices: body.qtype === "free_text" ? [] : toChoices(body),
       });
-      return mapBankQuestion(res.data, DEFAULT_POOL_NAME);
+      return mapBankQuestion(res.data);
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/questions\/bulk$/,
+    handler: async (_m, body) => {
+      const pools = (await http.get("/admin/pools")).data;
+      const poolId = await ensureDefaultPool(pools);
+      const res = await http.post(`/admin/pools/${poolId}/questions/bulk`, {
+        questions: body.questions.map((question) => ({
+          prompt: question.text,
+          ...(question.category_id ? { categoryId: question.category_id } : {}),
+          type: question.qtype === "free_text" ? "FREE_TEXT" : "MULTIPLE_CHOICE",
+          choices:
+            question.qtype === "free_text" ? [] : toChoices(question),
+        })),
+      });
+      return res.data.map((question) => mapBankQuestion(question));
     },
   },
   {
@@ -878,13 +982,14 @@ const routes = [
         err.response = { status: 404, data: { error: err.message, detail: err.message } };
         throw err;
       }
-      await http.patch(`/admin/questions/${m[1]}`, { active: false });
       const res = await http.post(`/admin/pools/${existing._poolId}/questions`, {
         prompt: body.text,
+        ...(body.category_id ? { categoryId: body.category_id } : {}),
         type: body.qtype === "free_text" ? "FREE_TEXT" : "MULTIPLE_CHOICE",
         choices: body.qtype === "free_text" ? [] : toChoices(body),
       });
-      return mapBankQuestion(res.data, existing._poolName);
+      await http.patch(`/admin/questions/${m[1]}`, { active: false });
+      return mapBankQuestion(res.data);
     },
   },
   {
@@ -921,7 +1026,7 @@ const routes = [
     method: "POST",
     pattern: /^\/assignments$/,
     handler: async (_m, body) => {
-      const startsAt = body.start_at || new Date().toISOString();
+      const startsAt = body.start_at || null;
       const dueAt = body.due_at || null;
       let created = 0;
       for (const userId of body.user_ids || []) {

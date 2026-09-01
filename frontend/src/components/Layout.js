@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { api } from "@/lib/api";
 import {
   LayoutDashboard, Users, HelpCircle, Clapperboard, Send, BarChart3, LogOut, BookOpen, Menu, X, Bell,
+  Settings,
 } from "lucide-react";
 import { BrandLockup } from "@/components/brand/MartiMark";
 import { WaveLine, RouteRule, WaveGlyph, MapDots } from "@/components/brand/Decoration";
@@ -19,6 +20,7 @@ const adminNav = [
 const adminNav2 = [{ to: "/admin/reports", label: "Raporlar", icon: BarChart3 }];
 
 const employeeNav = [{ to: "/trainings", label: "Eğitimlerim", icon: BookOpen }];
+const accountNav = [{ to: "/settings", label: "Profil Ayarları", icon: Settings }];
 
 const relativeTime = (iso) => {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
@@ -271,6 +273,7 @@ export default function Layout({ children }) {
             ) : (
               <NavGroup label="Eğitim" items={employeeNav} onNavigate={closeMobile} />
             )}
+            <NavGroup label="Hesabım" items={accountNav} onNavigate={closeMobile} />
           </nav>
 
           <div className="p-2.5">
@@ -282,10 +285,10 @@ export default function Layout({ children }) {
                   {user?.name?.[0]?.toUpperCase()}
                 </div>
               )}
-              <div className="flex-1 min-w-0">
+              <button type="button" onClick={() => { navigate("/settings"); closeMobile(); }} className="flex-1 min-w-0 text-left" title="Profil ayarlarını aç">
                 <p className="text-[12.5px] font-medium text-white truncate leading-tight" data-testid="sidebar-user-name">{user?.name}</p>
                 <p className="text-[10.5px] text-navy-400 truncate">{user?.role === "admin" ? "Yönetici" : "Çalışan"}</p>
-              </div>
+              </button>
               <button
                 data-testid="logout-btn"
                 onClick={logout}

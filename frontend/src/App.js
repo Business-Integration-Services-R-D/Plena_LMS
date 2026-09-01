@@ -5,6 +5,9 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import AuthCallback from "@/pages/AuthCallback";
 import ActivatePage from "@/pages/ActivatePage";
 import LoginPage from "@/pages/LoginPage";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import SettingsPage from "@/pages/SettingsPage";
 import Layout from "@/components/Layout";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import UsersPage from "@/pages/admin/UsersPage";
@@ -52,6 +55,8 @@ function AppRouter() {
   return (
     <Routes>
       <Route path="/login" element={authBypass ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/activate" element={<ActivatePage />} />
       <Route path="/" element={<HomeRedirect />} />
       <Route path="/dashboard" element={<HomeRedirect />} />
@@ -65,6 +70,7 @@ function AppRouter() {
       <Route path="/admin/notifications" element={<Protected adminOnly><NotificationsPage /></Protected>} />
       <Route path="/trainings" element={<Protected><MyTrainingsPage /></Protected>} />
       <Route path="/trainings/:assignmentId/watch" element={<Protected><WatchPage /></Protected>} />
+      <Route path="/settings" element={<Protected><SettingsPage /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

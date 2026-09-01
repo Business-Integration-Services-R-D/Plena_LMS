@@ -35,13 +35,18 @@ export async function PATCH(
     deactivatedAt?: Date | null;
     name?: string;
     passwordHash?: string;
+    sessionVersion?: { increment: number };
   } = {};
   if (parsed.data.active !== undefined) {
     data.active = parsed.data.active;
     data.deactivatedAt = parsed.data.active ? null : new Date();
+    if (!parsed.data.active) data.sessionVersion = { increment: 1 };
   }
   if (parsed.data.name) data.name = parsed.data.name;
-  if (parsed.data.password) data.passwordHash = await hashPassword(parsed.data.password);
+  if (parsed.data.password) {
+    data.passwordHash = await hashPassword(parsed.data.password);
+    data.sessionVersion = { increment: 1 };
+  }
 
   const before = await prisma.user.findUnique({
     where: { id, deletedAt: null },
@@ -61,17 +66,26 @@ export async function PATCH(
     );
   }
 
-  const user = await prisma.user.update({
-    where: { id, deletedAt: null },
-    data,
-    select: {
-      id: true,
-      email: true,
-      name: true,
-      role: true,
-      active: true,
-      deactivatedAt: true,
-    },
+  const user = await prisma.$transaction(async (tx) => {
+    const updated = await tx.user.update({
+      where: { id, deletedAt: null },
+      data,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        active: true,
+        deactivatedAt: true,
+      },
+    });
+    if (data.passwordHash) {
+      await tx.passwordResetToken.updateMany({
+        where: { userId: id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+    }
+    return updated;
   });
 
   // Aktiflik değişimi ayrı bir denetim eylemi; raporlarda ayrı filtrelenebilsin.
@@ -127,7 +141,12 @@ export async function DELETE(
     }),
     prisma.user.update({
       where: { id, deletedAt: null },
-      data: { active: false, deactivatedAt: now, deletedAt: now },
+      data: {
+        active: false,
+        deactivatedAt: now,
+        deletedAt: now,
+        sessionVersion: { increment: 1 },
+      },
     }),
   ]);
 

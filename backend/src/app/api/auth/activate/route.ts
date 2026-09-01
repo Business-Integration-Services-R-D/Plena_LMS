@@ -38,6 +38,7 @@ async function findCurrentActivation(token: string) {
           email: true,
           name: true,
           role: true,
+          sessionVersion: true,
           active: true,
           deletedAt: true,
         },
@@ -161,6 +162,7 @@ export async function POST(req: NextRequest) {
           email: true,
           name: true,
           role: true,
+          sessionVersion: true,
           active: true,
         },
       });

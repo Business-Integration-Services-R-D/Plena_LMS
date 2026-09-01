@@ -37,6 +37,7 @@ async function upsertUser(
 async function upsertPool(
   name: string,
   description: string,
+  categoryId: string,
   questions: {
     prompt: string;
     choices: { text: string; isCorrect: boolean }[];
@@ -54,6 +55,7 @@ async function upsertPool(
       await prisma.question.create({
         data: {
           poolId: pool.id,
+          categoryId,
           prompt: q.prompt,
           sortOrder: idx,
           choices: { create: q.choices },
@@ -67,6 +69,14 @@ async function upsertPool(
 
 async function upsertCategory(name: string, description: string) {
   return prisma.category.upsert({
+    where: { name },
+    update: { description },
+    create: { name, description },
+  });
+}
+
+async function upsertQuestionCategory(name: string, description: string) {
+  return prisma.questionCategory.upsert({
     where: { name },
     update: { description },
     create: { name, description },
@@ -219,10 +229,21 @@ async function main() {
     });
   }
 
+  console.log("Soru kategorileri...");
+  const seyirQuestionCategory = await upsertQuestionCategory(
+    "Seyir Güvenliği",
+    "Manevra, köprüüstü ve seyir emniyeti soruları.",
+  );
+  const acilQuestionCategory = await upsertQuestionCategory(
+    "Acil Durum",
+    "Yangın, terk ve acil müdahale soruları.",
+  );
+
   console.log("Soru havuzları...");
   const manevraPool = await upsertPool(
     "Güvenli Manevra Havuzu",
     "Liman yaklaşımı ve manevra soruları",
+    seyirQuestionCategory.id,
     [
       {
         prompt: "Liman yaklaşımında ilk öncelik nedir?",
@@ -246,6 +267,7 @@ async function main() {
   const acilPool = await upsertPool(
     "Acil Durum Havuzu",
     "Yangın ve terk prosedürleri soruları",
+    acilQuestionCategory.id,
     [
       {
         prompt: "Acil durum alarmında ilk adım nedir?",

@@ -10,6 +10,7 @@ const schema = z.object({
   active: z.boolean().optional(),
   prompt: z.string().min(3).optional(),
   points: z.number().int().min(1).max(100).optional(),
+  categoryId: z.string().min(1).optional(),
 });
 
 /**
@@ -34,9 +35,25 @@ export async function PATCH(
     return NextResponse.json({ error: "Soru bulunamadı" }, { status: 404 });
   }
 
+  if (parsed.data.categoryId) {
+    const category = await prisma.questionCategory.findUnique({
+      where: { id: parsed.data.categoryId },
+    });
+    if (!category) {
+      return NextResponse.json(
+        { error: "Soru kategorisi bulunamadı" },
+        { status: 404 },
+      );
+    }
+  }
+
   const updated = await prisma.question.update({
     where: { id },
     data: parsed.data,
+    include: {
+      choices: true,
+      questionCategory: { select: { id: true, name: true } },
+    },
   });
 
   return NextResponse.json(updated);

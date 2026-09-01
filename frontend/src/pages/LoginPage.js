@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { GraduationCap, LogIn } from "lucide-react";
 import loginHero from "@/assets/brand/login-hero.jpg";
@@ -88,6 +88,11 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-400/30 focus:border-cyan-400/40 transition"
             />
+            <div className="flex justify-end px-1">
+              <Link data-testid="login-forgot-password-link" to="/forgot-password" className="text-xs font-medium text-cyan-300/80 transition-colors hover:text-cyan-200">
+                Şifremi unuttum
+              </Link>
+            </div>
             {error && (
               <p data-testid="login-error" className="text-xs text-red-400">{error}</p>
             )}

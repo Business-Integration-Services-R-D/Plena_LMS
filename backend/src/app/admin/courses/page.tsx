@@ -26,6 +26,13 @@ type Category = {
   courseCount: number;
 };
 
+type QuestionCategory = {
+  id: string;
+  name: string;
+  description: string;
+  questionCount: number;
+};
+
 type Pool = {
   id: string;
   name: string;
@@ -45,6 +52,7 @@ export default function AdminCoursesPage() {
   const [courses, setCourses] = useState<Course[]>([]);
   const [pools, setPools] = useState<Pool[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [questionCategories, setQuestionCategories] = useState<QuestionCategory[]>([]);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -64,6 +72,7 @@ export default function AdminCoursesPage() {
   const [poolDescription, setPoolDescription] = useState("");
 
   const [selectedPool, setSelectedPool] = useState("");
+  const [selectedQuestionCategory, setSelectedQuestionCategory] = useState("");
   const [prompt, setPrompt] = useState("");
   const [choices, setChoices] = useState(["", "", ""]);
   const [correctIndex, setCorrectIndex] = useState(0);
@@ -71,14 +80,16 @@ export default function AdminCoursesPage() {
   const [msg, setMsg] = useState("");
 
   const load = useCallback(async () => {
-    const [c, p, cat] = await Promise.all([
+    const [c, p, cat, questionCat] = await Promise.all([
       fetch("/api/admin/courses").then((r) => r.json()),
       fetch("/api/admin/pools").then((r) => r.json()),
       fetch("/api/admin/categories").then((r) => r.json()),
+      fetch("/api/admin/question-categories").then((r) => r.json()),
     ]);
     setCourses(c);
     setPools(p);
     setCategories(cat);
+    setQuestionCategories(questionCat);
     setSelectedPool((prev) => prev || (p as Pool[])[0]?.id || "");
     setCoursePoolId((prev) => prev || (p as Pool[])[0]?.id || "");
   }, []);
@@ -234,6 +245,7 @@ export default function AdminCoursesPage() {
 
     const result = await addQuestionAction({
       poolId: selectedPool,
+      categoryId: selectedQuestionCategory,
       prompt,
       choices: filled.map((c) => ({
         text: c.text,
@@ -455,6 +467,18 @@ export default function AdminCoursesPage() {
                 {pools.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} ({p.questionCount} soru)
+                  </option>
+                ))}
+              </select>
+              <select
+                className="w-full rounded-xl border border-sea-200 px-3 py-2"
+                value={selectedQuestionCategory}
+                onChange={(e) => setSelectedQuestionCategory(e.target.value)}
+              >
+                <option value="">Genel (varsayılan)</option>
+                {questionCategories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name} ({category.questionCount} soru)
                   </option>
                 ))}
               </select>
