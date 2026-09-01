@@ -15,7 +15,10 @@ export async function GET() {
       questions: {
         where: { active: true },
         orderBy: { sortOrder: "asc" },
-        include: { choices: true },
+        include: {
+          choices: true,
+          questionCategory: { select: { id: true, name: true } },
+        },
       },
       _count: { select: { courses: true } },
     },

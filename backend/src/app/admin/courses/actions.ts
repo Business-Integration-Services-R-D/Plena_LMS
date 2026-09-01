@@ -156,6 +156,7 @@ export async function createPoolAction(input: {
 
 export async function addQuestionAction(input: {
   poolId: string;
+  categoryId?: string;
   prompt: string;
   choices: { text: string; isCorrect: boolean }[];
 }): Promise<SimpleResult> {
@@ -173,10 +174,21 @@ export async function addQuestionAction(input: {
       return { ok: false, error: "Tam olarak 1 doğru cevap işaretleyin" };
     }
 
-    const pool = await prisma.questionPool.findUnique({
-      where: { id: input.poolId },
-    });
+    const [pool, category] = await Promise.all([
+      prisma.questionPool.findUnique({ where: { id: input.poolId } }),
+      input.categoryId
+        ? prisma.questionCategory.findUnique({ where: { id: input.categoryId } })
+        : prisma.questionCategory.upsert({
+            where: { name: "Genel" },
+            update: {},
+            create: {
+              name: "Genel",
+              description: "Belirli bir konu başlığına bağlı olmayan genel sorular.",
+            },
+          }),
+    ]);
     if (!pool) return { ok: false, error: "Soru havuzu bulunamadı" };
+    if (!category) return { ok: false, error: "Soru kategorisi bulunamadı" };
 
     const sortOrder = await prisma.question.count({
       where: { poolId: input.poolId },
@@ -185,6 +197,7 @@ export async function addQuestionAction(input: {
     await prisma.question.create({
       data: {
         poolId: input.poolId,
+        categoryId: category.id,
         prompt,
         sortOrder,
         choices: {

@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 const schema = z.object({
   prompt: z.string().min(3),
+  categoryId: z.string().min(1).optional(),
   type: z.nativeEnum(QuestionType).default(QuestionType.MULTIPLE_CHOICE),
   /// Yalnızca PER_QUESTION puanlamasında kullanılır.
   points: z.number().int().min(1).max(100).default(1),
@@ -51,11 +52,28 @@ export async function POST(
     return NextResponse.json({ error: "Soru havuzu bulunamadı" }, { status: 404 });
   }
 
+  const category = parsed.data.categoryId
+    ? await prisma.questionCategory.findUnique({
+        where: { id: parsed.data.categoryId },
+      })
+    : await prisma.questionCategory.upsert({
+        where: { name: "Genel" },
+        update: {},
+        create: {
+          name: "Genel",
+          description: "Belirli bir konu başlığına bağlı olmayan genel sorular.",
+        },
+      });
+  if (!category) {
+    return NextResponse.json({ error: "Soru kategorisi bulunamadı" }, { status: 404 });
+  }
+
   const sortOrder = await prisma.question.count({ where: { poolId } });
 
   const question = await prisma.question.create({
     data: {
       poolId,
+      categoryId: category.id,
       prompt: parsed.data.prompt.trim(),
       type: parsed.data.type,
       points: parsed.data.points,
@@ -71,7 +89,10 @@ export async function POST(
           }
         : {}),
     },
-    include: { choices: true },
+    include: {
+      choices: true,
+      questionCategory: { select: { id: true, name: true } },
+    },
   });
 
   return NextResponse.json(question, { status: 201 });

@@ -210,23 +210,38 @@ model QuestionPool {
   exams     Exam[]
 }
 
-model Question {
-  id        String       @id @default(cuid())
-  poolId    String
-  prompt    String
-  type      QuestionType @default(MULTIPLE_CHOICE)
-  /// Sınavın PER_QUESTION modunda sorunun ağırlığı; AUTO modunda yok sayılır.
-  points    Int          @default(1)
-  sortOrder Int          @default(0)
-  active    Boolean      @default(true)
-  createdAt DateTime     @default(now())
+/// Soru bankasındaki soruları konu başlığına göre gruplamak için kullanılır.
+/// Sınavlara soru seçmekte kullanılan QuestionPool'dan bağımsızdır.
+model QuestionCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  pool        QuestionPool @relation(fields: [poolId], references: [id], onDelete: Cascade)
-  choices     Choice[]
-  answers     QuizAnswer[]
-  checkpoints Checkpoint[]
+  questions Question[]
+}
+
+model Question {
+  id         String       @id @default(cuid())
+  poolId     String
+  categoryId String
+  prompt     String
+  type       QuestionType @default(MULTIPLE_CHOICE)
+  /// Sınavın PER_QUESTION modunda sorunun ağırlığı; AUTO modunda yok sayılır.
+  points     Int          @default(1)
+  sortOrder  Int          @default(0)
+  active     Boolean      @default(true)
+  createdAt  DateTime     @default(now())
+
+  pool             QuestionPool     @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  questionCategory QuestionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  choices          Choice[]
+  answers          QuizAnswer[]
+  checkpoints      Checkpoint[]
 
   @@index([poolId, sortOrder])
+  @@index([categoryId, active])
 }
 
 model Choice {

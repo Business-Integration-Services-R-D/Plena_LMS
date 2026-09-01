@@ -36,6 +36,8 @@ export default function TrainingDetailPage() {
   const { trainingId } = useParams();
   const [training, setTraining] = useState(null);
   const [questions, setQuestions] = useState([]);
+  const [questionCategories, setQuestionCategories] = useState([]);
+  const [quizCategoryFilter, setQuizCategoryFilter] = useState("all");
   const [uploading, setUploading] = useState(0);
   const [selectedIds, setSelectedIds] = useState([]);
   const [savingQuiz, setSavingQuiz] = useState(false);
@@ -61,7 +63,7 @@ export default function TrainingDetailPage() {
   // Kontrol noktası için soru kaynağı: havuzdan seç / yeni soru yaz (popup)
   const [cpSource, setCpSource] = useState("pool");
   const [cpQModal, setCpQModal] = useState(false);
-  const [cpQForm, setCpQForm] = useState({ text: "", qtype: "multiple_choice", options: ["", ""], correct_index: 0 });
+  const [cpQForm, setCpQForm] = useState({ text: "", qtype: "multiple_choice", options: ["", ""], correct_index: 0, category_id: "" });
   const [cpQSaving, setCpQSaving] = useState(false);
   const fileRef = useRef(null);
   const previewRef = useRef(null);
@@ -80,6 +82,7 @@ export default function TrainingDetailPage() {
   const load = useCallback(() => {
     api.get(`/trainings/${trainingId}`).then((r) => setTraining(r.data));
     api.get("/questions").then((r) => setQuestions(r.data));
+    api.get("/question-categories").then((r) => setQuestionCategories(r.data));
   }, [trainingId]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -180,12 +183,15 @@ export default function TrainingDetailPage() {
   const saveCpQuestion = async () => {
     setCpQSaving(true);
     try {
+      const filledOptions = cpQForm.options
+        .map((option, originalIndex) => ({ option, originalIndex }))
+        .filter(({ option }) => option.trim());
       const res = await api.post("/questions", {
         text: cpQForm.text,
         qtype: cpQForm.qtype,
-        options: cpQForm.qtype === "free_text" ? [] : cpQForm.options.filter((o) => o.trim()),
-        correct_index: cpQForm.qtype === "free_text" ? null : cpQForm.correct_index,
-        category: "",
+        options: cpQForm.qtype === "free_text" ? [] : filledOptions.map(({ option }) => option),
+        correct_index: cpQForm.qtype === "free_text" ? null : filledOptions.findIndex(({ originalIndex }) => originalIndex === cpQForm.correct_index),
+        category_id: cpQForm.category_id,
       });
       setQuestions((prev) => [...prev, res.data]);
       setCpInline((f) => ({
@@ -303,6 +309,10 @@ export default function TrainingDetailPage() {
     0,
   );
   const pointsOverLimit = scoringMode === "per_question" && totalPoints > MAX_TOTAL_POINTS;
+  const filteredQuizQuestions = questions.filter(
+    (question) =>
+      quizCategoryFilter === "all" || question.category_id === quizCategoryFilter,
+  );
   const isPdf = training.content_type === "pdf";
   const fmtPosition = (value) => isPdf ? `Sayfa ${value}` : fmtTime(value);
 
@@ -412,7 +422,7 @@ export default function TrainingDetailPage() {
                         name="cp-question-source"
                         className="accent-navy-900"
                         checked={cpSource === "new"}
-                        onChange={() => { setCpSource("new"); setCpQForm({ text: "", qtype: "multiple_choice", options: ["", ""], correct_index: 0 }); setCpQModal(true); }}
+                        onChange={() => { setCpSource("new"); setCpQForm({ text: "", qtype: "multiple_choice", options: ["", ""], correct_index: 0, category_id: "" }); setCpQModal(true); }}
                       />
                       Yeni bir soru yazmak istiyorum
                     </label>
@@ -434,7 +444,7 @@ export default function TrainingDetailPage() {
                     <option value="">Sorulacak soruyu seçin...</option>
                     {questions.map((q) => (
                       <option key={q.question_id} value={q.question_id}>
-                        {q.qtype === "free_text" ? "[Metin] " : ""}{q.text.slice(0, 80)}
+                        [{q.category || "Kategorisiz"}] {q.qtype === "free_text" ? "[Metin] " : ""}{q.text.slice(0, 80)}
                       </option>
                     ))}
                   </select>
@@ -605,6 +615,22 @@ export default function TrainingDetailPage() {
             </div>
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500 whitespace-nowrap">Kategori:</span>
+                <select
+                  data-testid="quiz-category-filter"
+                  className={inputCls + " w-auto min-w-44 pr-9"}
+                  value={quizCategoryFilter}
+                  onChange={(e) => setQuizCategoryFilter(e.target.value)}
+                >
+                  <option value="all">Tüm kategoriler</option>
+                  {questionCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name} ({category.questionCount})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-500 whitespace-nowrap">Puanlama:</span>
                 <select
                   data-testid="quiz-scoring-mode-select"
@@ -662,7 +688,10 @@ export default function TrainingDetailPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {questions.length === 0 && <p className="text-sm text-slate-400">Soru havuzu boş. Önce <Link to="/admin/questions" className="text-brand-600 hover:underline">soru ekleyin</Link>.</p>}
-            {questions.map((q) => {
+            {questions.length > 0 && filteredQuizQuestions.length === 0 && (
+              <p className="text-sm text-slate-400 md:col-span-2">Bu kategoride gösterilecek soru yok.</p>
+            )}
+            {filteredQuizQuestions.map((q) => {
               const selected = selectedIds.includes(q.question_id);
               // Bu soruya verilebilecek en yüksek puan = 100 - diğer soruların toplamı.
               const ownPoints = clampPoints(questionPoints[q.question_id]);
@@ -680,6 +709,7 @@ export default function TrainingDetailPage() {
                     <CheckCircle2 className={`w-4 h-4 shrink-0 ${selected ? "text-brand-600" : "text-slate-300"}`} />
                     <span className="text-sm text-slate-800 flex-1">{q.text}</span>
                   </button>
+                  <span className="text-xs text-amber-700 whitespace-nowrap">{q.category || "Kategorisiz"}</span>
                   <span className="text-xs text-slate-400 whitespace-nowrap">{q.qtype === "multiple_choice" ? "Seçmeli" : "Metin"}</span>
                   {scoringMode === "per_question" && selected && (
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -732,6 +762,17 @@ export default function TrainingDetailPage() {
         <DialogContent className="rounded-2xl max-w-lg">
           <DialogHeader><DialogTitle>Yeni Soru</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
+            <select
+              data-testid="cp-question-category-select"
+              className={inputCls}
+              value={cpQForm.category_id}
+              onChange={(e) => setCpQForm({ ...cpQForm, category_id: e.target.value })}
+            >
+              <option value="">Genel (varsayılan)</option>
+              {questionCategories.map((category) => (
+                <option key={category.id} value={category.id}>{category.name}</option>
+              ))}
+            </select>
             <textarea data-testid="cp-question-text-input" className={inputCls + " min-h-[80px]"} placeholder="Soru metni" value={cpQForm.text} onChange={(e) => setCpQForm({ ...cpQForm, text: e.target.value })} />
             <select
               data-testid="cp-question-type-select"
@@ -767,7 +808,7 @@ export default function TrainingDetailPage() {
               disabled={
                 cpQSaving ||
                 !cpQForm.text.trim() ||
-                (cpQForm.qtype === "multiple_choice" && cpQForm.options.filter((o) => o.trim()).length < 2)
+                (cpQForm.qtype === "multiple_choice" && (cpQForm.options.filter((o) => o.trim()).length < 2 || !cpQForm.options[cpQForm.correct_index]?.trim()))
               }
               onClick={saveCpQuestion}
             >
