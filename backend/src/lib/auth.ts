@@ -11,6 +11,7 @@ export type SessionUser = {
   email: string;
   name: string;
   role: Role;
+  sessionVersion: number;
 };
 
 function secretKey() {
@@ -32,6 +33,7 @@ export async function createSession(user: SessionUser) {
     email: user.email,
     name: user.name,
     role: user.role,
+    sessionVersion: user.sessionVersion,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -64,6 +66,7 @@ export async function getSession(): Promise<SessionUser | null> {
       email: String(payload.email),
       name: String(payload.name),
       role: payload.role as Role,
+      sessionVersion: Number(payload.sessionVersion || 0),
     };
   } catch {
     return null;
@@ -75,6 +78,11 @@ export async function requireSession(roles?: Role[]) {
   if (!session) return null;
   if (roles && !roles.includes(session.role)) return null;
   const user = await prisma.user.findUnique({ where: { id: session.id } });
-  if (!user || !user.active || user.deletedAt) return null;
+  if (
+    !user ||
+    !user.active ||
+    user.deletedAt ||
+    user.sessionVersion !== session.sessionVersion
+  ) return null;
   return session;
 }

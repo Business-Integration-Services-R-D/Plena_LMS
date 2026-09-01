@@ -589,6 +589,62 @@ const routes = [
     },
   },
   {
+    method: "POST",
+    pattern: /^\/auth\/forgot-password$/,
+    handler: async (_m, body) => {
+      const res = await http.post("/auth/forgot-password", body);
+      return res.data;
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/auth\/reset-password$/,
+    handler: async (_m, _body, query) => {
+      const res = await http.get("/auth/reset-password", {
+        params: { token: query.get("token") },
+      });
+      return res.data;
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/auth\/reset-password$/,
+    handler: async (_m, body) => {
+      const res = await http.post("/auth/reset-password", body);
+      return res.data;
+    },
+  },
+  {
+    method: "GET",
+    pattern: /^\/profile$/,
+    handler: async () => {
+      const res = await http.get("/user/profile");
+      return toUiUser(res.data);
+    },
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/profile$/,
+    handler: async (_m, body) => {
+      const res = await http.patch("/user/profile", {
+        name: body.name,
+      });
+      return toUiUser(res.data);
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/profile\/change-password$/,
+    handler: async (_m, body) => {
+      const res = await http.post("/user/change-password", {
+        currentPassword: body.current_password,
+        newPassword: body.new_password,
+        newPasswordConfirmation: body.new_password_confirmation,
+      });
+      return res.data;
+    },
+  },
+  {
     method: "GET",
     pattern: /^\/auth\/activate$/,
     handler: async (_m, _body, query) => {

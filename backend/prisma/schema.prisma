@@ -92,6 +92,10 @@ enum AuditAction {
   USER_LOGGED_IN
   USER_LOGGED_OUT
   USER_ACTIVATED_ACCOUNT
+  USER_UPDATED_PROFILE
+  USER_CHANGED_PASSWORD
+  USER_REQUESTED_PASSWORD_RESET
+  USER_RESET_PASSWORD
 }
 
 enum NotificationKind {
@@ -110,6 +114,7 @@ model User {
   name          String
   passwordHash  String
   role          Role      @default(USER)
+  sessionVersion Int      @default(0)
   active        Boolean   @default(true)
   deletedAt     DateTime?
   deactivatedAt DateTime?
@@ -124,10 +129,25 @@ model User {
   quizAttempts     QuizAttempt[]
   auditLogs        AuditLog[]
   activationTokens UserActivationToken[]
+  passwordResetTokens PasswordResetToken[]
   notifications    UserNotification[]
 
   @@index([active])
   @@index([deletedAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
 }
 
 model UserActivationToken {

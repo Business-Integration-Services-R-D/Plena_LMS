@@ -1,9 +1,16 @@
 import { ACTIVATION_TTL_MINUTES } from "./activation";
+import { PASSWORD_RESET_TTL_MINUTES } from "./password-reset";
 
 type ActivationEmailInput = {
   to: string;
   name: string;
   code: string;
+  token: string;
+};
+
+type PasswordResetEmailInput = {
+  to: string;
+  name: string;
   token: string;
 };
 
@@ -22,6 +29,10 @@ function appUrl() {
 
 function activationUrl(token: string) {
   return `${appUrl()}/activate?token=${encodeURIComponent(token)}`;
+}
+
+function passwordResetUrl(token: string) {
+  return `${appUrl()}/reset-password?token=${encodeURIComponent(token)}`;
 }
 
 function activationText({ name, code, token }: ActivationEmailInput) {
@@ -98,7 +109,12 @@ function activationHtml({ name, code, token }: ActivationEmailInput) {
 </html>`;
 }
 
-export async function sendActivationEmail(input: ActivationEmailInput) {
+async function sendEmail(input: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}) {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     throw new Error("RESEND_API_KEY tanımlı değil");
@@ -115,9 +131,9 @@ export async function sendActivationEmail(input: ActivationEmailInput) {
         process.env.EMAIL_FROM ||
         "Plena LMS <noreply@bislabs.tech>",
       to: [input.to],
-      subject: "Plena LMS - Hesabınızı Aktive Edin",
-      html: activationHtml(input),
-      text: activationText(input),
+      subject: input.subject,
+      html: input.html,
+      text: input.text,
     }),
     signal: AbortSignal.timeout(10_000),
   });
@@ -128,9 +144,47 @@ export async function sendActivationEmail(input: ActivationEmailInput) {
 
   if (!response.ok) {
     throw new Error(
-      payload?.message || payload?.name || "Aktivasyon maili gönderilemedi",
+      payload?.message || payload?.name || "E-posta gönderilemedi",
     );
   }
 
   return { id: payload?.id ?? null };
+}
+
+export async function sendActivationEmail(input: ActivationEmailInput) {
+  return sendEmail({
+    to: input.to,
+    subject: "Plena LMS - Hesabınızı Aktive Edin",
+    html: activationHtml(input),
+    text: activationText(input),
+  });
+}
+
+export async function sendPasswordResetEmail(input: PasswordResetEmailInput) {
+  const safeName = escapeHtml(input.name);
+  const resetUrl = passwordResetUrl(input.token);
+  const text = `Plena LMS\n\nMerhaba ${input.name},\n\nŞifrenizi yenilemek için aşağıdaki bağlantıyı kullanın:\n\n${resetUrl}\n\nBu bağlantı ${PASSWORD_RESET_TTL_MINUTES} dakika boyunca geçerlidir ve yalnızca bir kez kullanılabilir. Bu talebi siz oluşturmadıysanız e-postayı görmezden gelebilirsiniz.`;
+  const html = `<!doctype html>
+<html lang="tr">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Şifre Yenileme</title></head>
+  <body style="margin:0;padding:0;background:#edf4fb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#172033">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" style="padding:44px 18px">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;background:#fff;border:1px solid #d8e7f4;border-radius:22px;box-shadow:0 20px 55px rgba(14,32,51,.14)"><tr><td align="center" style="padding:44px 38px">
+        <div style="font-size:34px;font-weight:300;color:#172033;margin-bottom:28px">Plena LMS</div>
+        <h1 style="font-size:25px;font-weight:500;margin:0 0 12px">Şifrenizi yenileyin</h1>
+        <p style="font-size:15px;line-height:1.6;color:#475569;margin:0 0 8px">Merhaba ${safeName},</p>
+        <p style="font-size:14px;line-height:1.6;color:#64748b;margin:0 0 26px">Şifrenizi değiştirmek için aşağıdaki güvenli bağlantıyı kullanın.</p>
+        <a href="${resetUrl}" style="display:inline-block;border-radius:999px;padding:13px 24px;background:#0e2033;color:#fff;text-decoration:none;font-size:14px;font-weight:600">ŞİFREMİ YENİLE</a>
+        <p style="font-size:12px;line-height:1.6;color:#64748b;margin:26px 0 0">Bağlantı ${PASSWORD_RESET_TTL_MINUTES} dakika geçerlidir ve yalnızca bir kez kullanılabilir. Talebi siz oluşturmadıysanız bu e-postayı görmezden gelebilirsiniz.</p>
+      </td></tr></table>
+    </td></tr></table>
+  </body>
+</html>`;
+
+  return sendEmail({
+    to: input.to,
+    subject: "Plena LMS - Şifrenizi Yenileyin",
+    html,
+    text,
+  });
 }
