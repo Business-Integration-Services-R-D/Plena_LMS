@@ -5,7 +5,9 @@ import { PageHeader } from "@/components/Layout";
 import PdfPreview from "@/components/PdfPreview";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock, ChevronDown, ChevronLeft, ChevronRight, FileText } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Eye, FileText, Search } from "lucide-react";
 
 const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
 
@@ -38,6 +40,8 @@ export default function TrainingDetailPage() {
   const [questions, setQuestions] = useState([]);
   const [questionCategories, setQuestionCategories] = useState([]);
   const [quizCategoryFilter, setQuizCategoryFilter] = useState("all");
+  const [quizCategoryPickerOpen, setQuizCategoryPickerOpen] = useState(false);
+  const [quizQuestionSearch, setQuizQuestionSearch] = useState("");
   const [uploading, setUploading] = useState(0);
   const [selectedIds, setSelectedIds] = useState([]);
   const [savingQuiz, setSavingQuiz] = useState(false);
@@ -65,6 +69,9 @@ export default function TrainingDetailPage() {
   const [cpQModal, setCpQModal] = useState(false);
   const [cpQForm, setCpQForm] = useState({ text: "", qtype: "multiple_choice", options: ["", ""], correct_index: 0, category_id: "" });
   const [cpQSaving, setCpQSaving] = useState(false);
+  const [editingBankQuestion, setEditingBankQuestion] = useState(null);
+  const [bankQuestionForm, setBankQuestionForm] = useState({ text: "", qtype: "multiple_choice", options: ["", ""], correct_index: 0, category_id: "" });
+  const [bankQuestionSaving, setBankQuestionSaving] = useState(false);
   const fileRef = useRef(null);
   const previewRef = useRef(null);
   const passScoreRef = useRef(null);
@@ -212,6 +219,76 @@ export default function TrainingDetailPage() {
 
   const setCpQOption = (i, v) => setCpQForm((f) => ({ ...f, options: f.options.map((o, j) => (j === i ? v : o)) }));
 
+  const openBankQuestionEditor = (question) => {
+    setBankQuestionForm({
+      text: question.text,
+      qtype: question.qtype,
+      options: question.options?.length ? question.options : ["", ""],
+      correct_index: question.correct_index ?? 0,
+      category_id: question.category_id || "",
+    });
+    setEditingBankQuestion(question);
+  };
+
+  const setBankQuestionOption = (index, value) =>
+    setBankQuestionForm((current) => ({
+      ...current,
+      options: current.options.map((option, itemIndex) =>
+        itemIndex === index ? value : option,
+      ),
+    }));
+
+  const saveBankQuestion = async () => {
+    if (!editingBankQuestion) return;
+    const filledOptions = bankQuestionForm.options
+      .map((option, originalIndex) => ({ option, originalIndex }))
+      .filter(({ option }) => option.trim());
+    setBankQuestionSaving(true);
+    try {
+      const res = await api.put(`/questions/${editingBankQuestion.question_id}`, {
+        ...bankQuestionForm,
+        options:
+          bankQuestionForm.qtype === "free_text"
+            ? []
+            : filledOptions.map(({ option }) => option),
+        correct_index:
+          bankQuestionForm.qtype === "free_text"
+            ? null
+            : filledOptions.findIndex(
+                ({ originalIndex }) => originalIndex === bankQuestionForm.correct_index,
+              ),
+      });
+      const updated = res.data;
+      const oldId = editingBankQuestion.question_id;
+      setQuestions((current) =>
+        current.map((question) => (question.question_id === oldId ? updated : question)),
+      );
+      setSelectedIds((current) =>
+        current.map((questionId) => (questionId === oldId ? updated.question_id : questionId)),
+      );
+      setQuestionPoints((current) => {
+        if (current[oldId] == null) return current;
+        const next = { ...current, [updated.question_id]: current[oldId] };
+        delete next[oldId];
+        return next;
+      });
+      setCpInline((current) =>
+        current.question_id === oldId
+          ? { ...current, question_id: updated.question_id }
+          : current,
+      );
+      api.get("/question-categories").then((categoryRes) =>
+        setQuestionCategories(categoryRes.data),
+      );
+      setEditingBankQuestion(null);
+      toast.success("Soru güncellendi");
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Soru güncellenemedi");
+    } finally {
+      setBankQuestionSaving(false);
+    }
+  };
+
   const addCheckpointFromPreview = async () => {
     if (!cpInline.question_id) return toast.error("Bir soru seçin");
     if (training.content_type === "pdf" && (cpAnchor < 1 || cpAnchor > training.pdf_page_count)) return toast.error("Sayfa PDF aralığını aşıyor");
@@ -309,9 +386,18 @@ export default function TrainingDetailPage() {
     0,
   );
   const pointsOverLimit = scoringMode === "per_question" && totalPoints > MAX_TOTAL_POINTS;
-  const filteredQuizQuestions = questions.filter(
-    (question) =>
-      quizCategoryFilter === "all" || question.category_id === quizCategoryFilter,
+  const normalizedQuestionSearch = quizQuestionSearch.trim().toLocaleLowerCase("tr-TR");
+  const filteredQuizQuestions = questions.filter((question) => {
+    const matchesCategory =
+      quizCategoryFilter === "all" || question.category_id === quizCategoryFilter;
+    const searchableContent = [question.text, ...(question.options || [])]
+      .join(" ")
+      .toLocaleLowerCase("tr-TR");
+    return matchesCategory &&
+      (!normalizedQuestionSearch || searchableContent.includes(normalizedQuestionSearch));
+  });
+  const selectedQuizCategory = questionCategories.find(
+    (category) => category.id === quizCategoryFilter,
   );
   const isPdf = training.content_type === "pdf";
   const fmtPosition = (value) => isPdf ? `Sayfa ${value}` : fmtTime(value);
@@ -616,19 +702,62 @@ export default function TrainingDetailPage() {
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-500 whitespace-nowrap">Kategori:</span>
-                <select
-                  data-testid="quiz-category-filter"
-                  className={inputCls + " w-auto min-w-44 pr-9"}
-                  value={quizCategoryFilter}
-                  onChange={(e) => setQuizCategoryFilter(e.target.value)}
-                >
-                  <option value="all">Tüm kategoriler</option>
-                  {questionCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name} ({category.questionCount})
-                    </option>
-                  ))}
-                </select>
+                <Popover open={quizCategoryPickerOpen} onOpenChange={setQuizCategoryPickerOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      role="combobox"
+                      aria-expanded={quizCategoryPickerOpen}
+                      data-testid="quiz-category-filter"
+                      className={`${inputCls} flex min-w-48 items-center justify-between gap-3 text-left ${quizCategoryPickerOpen ? "ring-2 ring-brand-500 border-transparent" : ""}`}
+                    >
+                      <span className="min-w-0 truncate">{selectedQuizCategory?.name || "Tüm kategoriler"}</span>
+                      <ChevronsUpDown className="h-4 w-4 shrink-0 text-slate-400" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl p-0 shadow-xl">
+                    <Command>
+                      <CommandInput placeholder="Kategori ara..." data-testid="quiz-category-search-input" />
+                      <CommandList className="max-h-80 p-1">
+                        <CommandEmpty>Kategori bulunamadı.</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="tüm kategoriler"
+                            onSelect={() => {
+                              setQuizCategoryFilter("all");
+                              setQuizCategoryPickerOpen(false);
+                            }}
+                            className="rounded-lg px-3 py-2.5"
+                          >
+                            <CheckCircle2 className={`h-4 w-4 ${quizCategoryFilter === "all" ? "text-brand-600" : "text-transparent"}`} />
+                            <span className="flex-1 font-medium">Tüm kategoriler</span>
+                            <span className="text-xs text-slate-400">{questions.length} soru</span>
+                          </CommandItem>
+                        </CommandGroup>
+                        <CommandGroup heading="Kategoriler">
+                          {questionCategories.map((category) => (
+                            <CommandItem
+                              key={category.id}
+                              value={`${category.name} ${category.description || ""}`}
+                              onSelect={() => {
+                                setQuizCategoryFilter(category.id);
+                                setQuizCategoryPickerOpen(false);
+                              }}
+                              className="items-start rounded-lg px-3 py-2.5"
+                            >
+                              <CheckCircle2 className={`mt-0.5 h-4 w-4 ${quizCategoryFilter === category.id ? "text-brand-600" : "text-transparent"}`} />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate font-medium text-navy-950">{category.name}</span>
+                                {category.description && <span className="mt-0.5 block truncate text-xs text-slate-400">{category.description}</span>}
+                              </span>
+                              <span className="mt-0.5 whitespace-nowrap text-xs text-slate-400">{category.questionCount} soru</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-500 whitespace-nowrap">Puanlama:</span>
@@ -686,10 +815,26 @@ export default function TrainingDetailPage() {
               )}
             </div>
           </div>
+          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-md">
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                data-testid="quiz-question-search"
+                className={inputCls + " pl-10"}
+                placeholder="Soru metni veya seçeneklerde ara..."
+                value={quizQuestionSearch}
+                onChange={(e) => setQuizQuestionSearch(e.target.value)}
+              />
+            </div>
+            {(quizQuestionSearch || quizCategoryFilter !== "all") && (
+              <span className="text-xs text-slate-400">{filteredQuizQuestions.length} soru gösteriliyor</span>
+            )}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {questions.length === 0 && <p className="text-sm text-slate-400">Soru havuzu boş. Önce <Link to="/admin/questions" className="text-brand-600 hover:underline">soru ekleyin</Link>.</p>}
             {questions.length > 0 && filteredQuizQuestions.length === 0 && (
-              <p className="text-sm text-slate-400 md:col-span-2">Bu kategoride gösterilecek soru yok.</p>
+              <p className="text-sm text-slate-400 md:col-span-2">Filtreler ve aramayla eşleşen soru bulunamadı.</p>
             )}
             {filteredQuizQuestions.map((q) => {
               const selected = selectedIds.includes(q.question_id);
@@ -701,6 +846,16 @@ export default function TrainingDetailPage() {
                   key={q.question_id}
                   className={`flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-colors ${selected ? "border-brand-500 bg-brand-50/50" : "border-navy-900/5 bg-[#F5F8FA] hover:bg-slate-100"}`}
                 >
+                  <button
+                    type="button"
+                    aria-label="Soruyu görüntüle ve düzenle"
+                    title="Soruyu görüntüle ve düzenle"
+                    data-testid={`quiz-question-edit-${q.question_id}`}
+                    onClick={() => openBankQuestionEditor(q)}
+                    className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-white hover:text-brand-600"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
                   <button
                     data-testid={`quiz-question-toggle-${q.question_id}`}
                     onClick={() => toggleQuizQuestion(q.question_id)}
@@ -756,6 +911,97 @@ export default function TrainingDetailPage() {
           )}
         </div>
       </div>
+
+      <Dialog open={!!editingBankQuestion} onOpenChange={(open) => !open && setEditingBankQuestion(null)}>
+        <DialogContent className="rounded-2xl max-w-lg">
+          <DialogHeader><DialogTitle>Soruyu Düzenle</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-2">
+            <label className="block space-y-1.5">
+              <span className="text-xs font-medium text-slate-500">Kategori</span>
+              <select
+                data-testid="bank-question-category-select"
+                className={inputCls}
+                value={bankQuestionForm.category_id}
+                onChange={(e) => setBankQuestionForm({ ...bankQuestionForm, category_id: e.target.value })}
+              >
+                <option value="">Genel (varsayılan)</option>
+                {questionCategories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+            </label>
+            <textarea
+              data-testid="bank-question-text-input"
+              className={inputCls + " min-h-[80px]"}
+              placeholder="Soru metni"
+              value={bankQuestionForm.text}
+              onChange={(e) => setBankQuestionForm({ ...bankQuestionForm, text: e.target.value })}
+            />
+            <select
+              data-testid="bank-question-type-select"
+              className={inputCls}
+              value={bankQuestionForm.qtype}
+              onChange={(e) => setBankQuestionForm({ ...bankQuestionForm, qtype: e.target.value })}
+            >
+              <option value="multiple_choice">Çoktan Seçmeli</option>
+              <option value="free_text">Serbest Metin</option>
+            </select>
+            {bankQuestionForm.qtype === "multiple_choice" && (
+              <div className="space-y-2">
+                <p className="text-xs text-slate-400">Seçenekler — doğru cevabı işaretleyin</p>
+                {bankQuestionForm.options.map((option, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="bank-question-correct"
+                      checked={bankQuestionForm.correct_index === index}
+                      onChange={() => setBankQuestionForm({ ...bankQuestionForm, correct_index: index })}
+                      className="accent-emerald-600"
+                    />
+                    <input
+                      className={inputCls}
+                      placeholder={`Seçenek ${index + 1}`}
+                      value={option}
+                      onChange={(e) => setBankQuestionOption(index, e.target.value)}
+                    />
+                    {bankQuestionForm.options.length > 2 && (
+                      <button
+                        type="button"
+                        aria-label="Seçeneği sil"
+                        onClick={() => setBankQuestionForm({ ...bankQuestionForm, options: bankQuestionForm.options.filter((_, itemIndex) => itemIndex !== index), correct_index: 0 })}
+                        className="p-2 text-slate-300 hover:text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setBankQuestionForm({ ...bankQuestionForm, options: [...bankQuestionForm.options, ""] })}
+                  className="text-sm text-brand-600 font-medium hover:underline"
+                >
+                  + Seçenek ekle
+                </button>
+              </div>
+            )}
+            <button
+              data-testid="bank-question-save-btn"
+              className={btnPrimary + " w-full"}
+              disabled={
+                bankQuestionSaving ||
+                !bankQuestionForm.text.trim() ||
+                (bankQuestionForm.qtype === "multiple_choice" &&
+                  (bankQuestionForm.options.filter((option) => option.trim()).length < 2 ||
+                    !bankQuestionForm.options[bankQuestionForm.correct_index]?.trim()))
+              }
+              onClick={saveBankQuestion}
+            >
+              {bankQuestionSaving ? "Kaydediliyor..." : "Kaydet"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Kontrol noktası için yeni soru popup'ı (soru havuzuna da eklenir) */}
       <Dialog open={cpQModal} onOpenChange={(o) => { if (!o) { setCpQModal(false); setCpSource("pool"); } }}>

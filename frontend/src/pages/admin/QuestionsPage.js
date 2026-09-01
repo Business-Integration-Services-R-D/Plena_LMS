@@ -3,6 +3,15 @@ import { api } from "@/lib/api";
 import { PageHeader } from "@/components/Layout";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   CheckCircle2,
+  ChevronsUpDown,
   ChevronRight,
   FolderPlus,
   LayoutGrid,
@@ -30,9 +40,9 @@ const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-whi
 const btnPrimary = "px-5 py-2.5 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow] disabled:opacity-40";
 const btnSecondary = "px-5 py-2.5 rounded-full border border-navy-900/10 bg-white text-navy-950 text-sm font-medium hover:bg-slate-50 active:scale-[0.98] transition-colors disabled:opacity-40";
 
-const newQuestionForm = (categoryId = "") => ({
+const newQuestionForm = (categoryId = "", qtype = "multiple_choice") => ({
   text: "",
-  qtype: "multiple_choice",
+  qtype,
   options: ["", ""],
   correct_index: 0,
   category_id: categoryId,
@@ -52,6 +62,7 @@ export default function QuestionsPage() {
   const [form, setForm] = useState(newQuestionForm());
   const [typeFilter, setTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [viewMode, setViewMode] = useState("cards");
 
   const load = useCallback(async () => {
@@ -68,7 +79,11 @@ export default function QuestionsPage() {
   }, [load]);
 
   const openNew = (categoryId = "") => {
-    setForm(newQuestionForm(categoryId));
+    const initialType =
+      viewMode === "cards" && typeFilter === "free_text"
+        ? "free_text"
+        : "multiple_choice";
+    setForm(newQuestionForm(categoryId, initialType));
     setModal({});
   };
 
@@ -276,14 +291,66 @@ export default function QuestionsPage() {
         )}
         <div className="flex flex-wrap items-center gap-2">
           {viewMode === "cards" && (
-            <select data-testid="category-filter" className={inputCls + " sm:w-56"} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-              <option value="all">Tüm kategoriler</option>
-              {categories.map((category) => <option key={category.id} value={category.id}>{category.name} ({category.questionCount})</option>)}
-            </select>
+            <Popover open={categoryPickerOpen} onOpenChange={setCategoryPickerOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  role="combobox"
+                  aria-expanded={categoryPickerOpen}
+                  data-testid="category-filter"
+                  className={`${inputCls} flex min-w-56 items-center justify-between gap-3 text-left sm:w-64 ${categoryPickerOpen ? "ring-2 ring-brand-500 border-transparent" : ""}`}
+                >
+                  <span className="min-w-0 truncate">{selectedCategory?.name || "Tüm kategoriler"}</span>
+                  <ChevronsUpDown className="h-4 w-4 shrink-0 text-slate-400" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl p-0 shadow-xl">
+                <Command>
+                  <CommandInput placeholder="Kategori ara..." data-testid="category-search-input" />
+                  <CommandList className="max-h-80 p-1">
+                    <CommandEmpty>Kategori bulunamadı.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="tüm kategoriler"
+                        onSelect={() => {
+                          setCategoryFilter("all");
+                          setCategoryPickerOpen(false);
+                        }}
+                        className="rounded-lg px-3 py-2.5"
+                      >
+                        <CheckCircle2 className={`h-4 w-4 ${categoryFilter === "all" ? "text-brand-600" : "text-transparent"}`} />
+                        <span className="flex-1 font-medium">Tüm kategoriler</span>
+                        <span className="text-xs text-slate-400">{questions.length} soru</span>
+                      </CommandItem>
+                    </CommandGroup>
+                    <CommandGroup heading="Kategoriler">
+                      {categories.map((category) => (
+                        <CommandItem
+                          key={category.id}
+                          value={`${category.name} ${category.description || ""}`}
+                          onSelect={() => {
+                            setCategoryFilter(category.id);
+                            setCategoryPickerOpen(false);
+                          }}
+                          className="items-start rounded-lg px-3 py-2.5"
+                        >
+                          <CheckCircle2 className={`mt-0.5 h-4 w-4 ${categoryFilter === category.id ? "text-brand-600" : "text-transparent"}`} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium text-navy-950">{category.name}</span>
+                            {category.description && <span className="mt-0.5 block truncate text-xs text-slate-400">{category.description}</span>}
+                          </span>
+                          <span className="mt-0.5 whitespace-nowrap text-xs text-slate-400">{category.questionCount} soru</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           )}
           <div className="flex gap-1 rounded-full bg-slate-100 p-1">
             <button aria-label="Kart görünümü" data-testid="view-cards" onClick={() => setViewMode("cards")} className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium ${viewMode === "cards" ? "bg-white text-navy-950 shadow-sm" : "text-slate-500"}`}><LayoutGrid className="w-3.5 h-3.5" /> Kartlar</button>
-            <button aria-label="Kategori görünümü" data-testid="view-categories" onClick={() => { setCategoryFilter("all"); setViewMode("categories"); }} className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium ${viewMode === "categories" ? "bg-white text-navy-950 shadow-sm" : "text-slate-500"}`}><Tags className="w-3.5 h-3.5" /> Kategoriler</button>
+            <button aria-label="Kategori görünümü" data-testid="view-categories" onClick={() => { setCategoryPickerOpen(false); setCategoryFilter("all"); setViewMode("categories"); }} className={`flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-medium ${viewMode === "categories" ? "bg-white text-navy-950 shadow-sm" : "text-slate-500"}`}><Tags className="w-3.5 h-3.5" /> Kategoriler</button>
           </div>
         </div>
       </div>
