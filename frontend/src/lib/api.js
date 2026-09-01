@@ -896,6 +896,24 @@ const routes = [
     },
   },
   {
+    method: "POST",
+    pattern: /^\/questions\/bulk$/,
+    handler: async (_m, body) => {
+      const pools = (await http.get("/admin/pools")).data;
+      const poolId = await ensureDefaultPool(pools);
+      const res = await http.post(`/admin/pools/${poolId}/questions/bulk`, {
+        questions: body.questions.map((question) => ({
+          prompt: question.text,
+          ...(question.category_id ? { categoryId: question.category_id } : {}),
+          type: question.qtype === "free_text" ? "FREE_TEXT" : "MULTIPLE_CHOICE",
+          choices:
+            question.qtype === "free_text" ? [] : toChoices(question),
+        })),
+      });
+      return res.data.map((question) => mapBankQuestion(question));
+    },
+  },
+  {
     method: "PUT",
     pattern: /^\/questions\/([^/]+)$/,
     handler: async (m, body) => {

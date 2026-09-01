@@ -66,6 +66,8 @@ export default function TrainingDetailPage() {
   const [cpAdding, setCpAdding] = useState(false);
   // Kontrol noktası için soru kaynağı: havuzdan seç / yeni soru yaz (popup)
   const [cpSource, setCpSource] = useState("pool");
+  const [cpQuestionPickerOpen, setCpQuestionPickerOpen] = useState(false);
+  const [cpQuestionSearch, setCpQuestionSearch] = useState("");
   const [cpQModal, setCpQModal] = useState(false);
   const [cpQForm, setCpQForm] = useState({ text: "", qtype: "multiple_choice", options: ["", ""], correct_index: 0, category_id: "" });
   const [cpQSaving, setCpQSaving] = useState(false);
@@ -173,6 +175,8 @@ export default function TrainingDetailPage() {
       retry_exhausted: "start",
     });
     setCpSource("pool");
+    setCpQuestionPickerOpen(false);
+    setCpQuestionSearch("");
     setCpPanelOpen(true);
   };
 
@@ -526,14 +530,65 @@ export default function TrainingDetailPage() {
                   </div>
                   {cpSource === "pool" && (
                   <>
-                  <select data-testid="cp-preview-question-select" className={inputCls} value={cpInline.question_id} onChange={(e) => selectCpQuestion(e.target.value)}>
-                    <option value="">Sorulacak soruyu seçin...</option>
-                    {questions.map((q) => (
-                      <option key={q.question_id} value={q.question_id}>
-                        [{q.category || "Kategorisiz"}] {q.qtype === "free_text" ? "[Metin] " : ""}{q.text.slice(0, 80)}
-                      </option>
-                    ))}
-                  </select>
+                  <Popover
+                    open={cpQuestionPickerOpen}
+                    onOpenChange={(open) => {
+                      setCpQuestionPickerOpen(open);
+                      if (!open) setCpQuestionSearch("");
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        data-testid="cp-preview-question-select"
+                        role="combobox"
+                        aria-expanded={cpQuestionPickerOpen}
+                        className={`${inputCls} flex items-center justify-between gap-3 text-left ${cpQuestionPickerOpen ? "ring-2 ring-brand-500 border-transparent" : ""}`}
+                      >
+                        <span className={`truncate ${cpInline.question_id ? "text-navy-950" : "text-slate-400"}`}>
+                          {cpInline.question_id && qById[cpInline.question_id]
+                            ? qById[cpInline.question_id].text
+                            : "Sorulacak soruyu seçin..."}
+                        </span>
+                        <ChevronsUpDown className="h-4 w-4 shrink-0 text-slate-400" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] min-w-[20rem] overflow-hidden rounded-xl p-0 shadow-xl">
+                      <Command shouldFilter>
+                        <CommandInput
+                          data-testid="cp-preview-question-search"
+                          placeholder="Soru metni veya seçeneklerde ara..."
+                          value={cpQuestionSearch}
+                          onValueChange={setCpQuestionSearch}
+                        />
+                        <CommandList className="max-h-80 p-1">
+                          <CommandEmpty>Aramanızla eşleşen soru bulunamadı.</CommandEmpty>
+                          <CommandGroup heading={`${questions.length} soru`}>
+                            {questions.map((q) => (
+                              <CommandItem
+                                key={q.question_id}
+                                value={`${q.question_id} ${q.category || "Genel"} ${q.qtype === "free_text" ? "serbest metin" : "çoktan seçmeli"} ${q.text} ${(q.options || []).join(" ")}`}
+                                onSelect={() => {
+                                  selectCpQuestion(q.question_id);
+                                  setCpQuestionPickerOpen(false);
+                                  setCpQuestionSearch("");
+                                }}
+                                className="items-start gap-2 rounded-lg px-3 py-2.5"
+                              >
+                                <CheckCircle2 className={`mt-0.5 h-4 w-4 shrink-0 ${cpInline.question_id === q.question_id ? "text-emerald-500" : "text-slate-200"}`} />
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm text-navy-950">{q.text}</span>
+                                  <span className="mt-0.5 block truncate text-xs text-slate-400">
+                                    {q.category || "Genel"} · {q.qtype === "free_text" ? "Serbest Metin" : "Çoktan Seçmeli"}
+                                  </span>
+                                </span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   {cpInline.question_id && qById[cpInline.question_id] && (
                     cpSelectedIsFreeText ? (
                       <p className="px-3 py-2 rounded-lg text-xs text-amber-700 bg-amber-50 border border-amber-200">

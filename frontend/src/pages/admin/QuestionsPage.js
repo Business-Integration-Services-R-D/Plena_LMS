@@ -27,8 +27,10 @@ import {
   ChevronsUpDown,
   ChevronRight,
   FolderPlus,
+  Info,
   LayoutGrid,
   ListChecks,
+  ListPlus,
   Pencil,
   Plus,
   Tags,
@@ -48,7 +50,32 @@ const newQuestionForm = (categoryId = "", qtype = "multiple_choice") => ({
   category_id: categoryId,
 });
 
+let bulkDraftSequence = 0;
+const newBulkDraft = (categoryId = "", qtype = "multiple_choice") => ({
+  ...newQuestionForm(categoryId, qtype),
+  draft_id: `bulk-question-${Date.now()}-${++bulkDraftSequence}`,
+});
+
+const BULK_DRAFT_STORAGE_KEY = "plena:question-bank:bulk-draft";
+
+const readBulkDraft = () => {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = JSON.parse(window.sessionStorage.getItem(BULK_DRAFT_STORAGE_KEY));
+    if (stored?.version !== 1 || !Array.isArray(stored.questions)) return null;
+    const questions = stored.questions.map((question) => ({
+      ...newBulkDraft(),
+      ...question,
+      options: Array.isArray(question.options) ? question.options : ["", ""],
+    }));
+    return questions.length ? { open: stored.open === true, questions } : null;
+  } catch {
+    return null;
+  }
+};
+
 export default function QuestionsPage() {
+  const [initialBulkDraft] = useState(readBulkDraft);
   const [questions, setQuestions] = useState([]);
   const [categories, setCategories] = useState([]);
   const [modal, setModal] = useState(null);
@@ -59,6 +86,9 @@ export default function QuestionsPage() {
   const [deleteMode, setDeleteMode] = useState("");
   const [deleteConfirmation, setDeleteConfirmation] = useState(null);
   const [categorySaving, setCategorySaving] = useState(false);
+  const [bulkModal, setBulkModal] = useState(Boolean(initialBulkDraft?.open));
+  const [bulkQuestions, setBulkQuestions] = useState(initialBulkDraft?.questions || []);
+  const [bulkSaving, setBulkSaving] = useState(false);
   const [form, setForm] = useState(newQuestionForm());
   const [typeFilter, setTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -78,6 +108,18 @@ export default function QuestionsPage() {
     load().catch(() => toast.error("Soru havuzu yüklenemedi"));
   }, [load]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (bulkModal && bulkQuestions.length) {
+      window.sessionStorage.setItem(
+        BULK_DRAFT_STORAGE_KEY,
+        JSON.stringify({ version: 1, open: true, questions: bulkQuestions }),
+      );
+    } else {
+      window.sessionStorage.removeItem(BULK_DRAFT_STORAGE_KEY);
+    }
+  }, [bulkModal, bulkQuestions]);
+
   const openNew = (categoryId = "") => {
     const initialType =
       viewMode === "cards" && typeFilter === "free_text"
@@ -87,13 +129,112 @@ export default function QuestionsPage() {
     setModal({});
   };
 
+  const openBulkQuestions = () => {
+    const activeCategory = categories.find((category) => category.id === categoryFilter);
+    const initialCategory =
+      categoryFilter === "all" || activeCategory?.isDefault ? "" : categoryFilter;
+    const initialType =
+      viewMode === "cards" && typeFilter === "free_text"
+        ? "free_text"
+        : "multiple_choice";
+    setBulkQuestions([
+      newBulkDraft(initialCategory, initialType),
+      newBulkDraft(initialCategory, initialType),
+    ]);
+    setBulkModal(true);
+  };
+
+  const updateBulkQuestion = (draftId, changes) =>
+    setBulkQuestions((current) =>
+      current.map((question) =>
+        question.draft_id === draftId ? { ...question, ...changes } : question,
+      ),
+    );
+
+  const updateBulkOption = (draftId, optionIndex, value) =>
+    setBulkQuestions((current) =>
+      current.map((question) =>
+        question.draft_id === draftId
+          ? {
+              ...question,
+              options: question.options.map((option, index) =>
+                index === optionIndex ? value : option,
+              ),
+            }
+          : question,
+      ),
+    );
+
+  const bulkQuestionStarted = (question) =>
+    Boolean(question.text.trim() || question.options.some((option) => option.trim()));
+
+  const bulkQuestionValidationMessages = (question) => {
+    if (!bulkQuestionStarted(question)) return [];
+    const messages = [];
+    if (question.text.trim().length < 3) {
+      messages.push("Lütfen soru metnini tamamlayın.");
+    }
+    if (question.qtype === "multiple_choice") {
+      if (question.options.filter((option) => option.trim()).length < 2) {
+        messages.push("En az 2 seçenek doldurulmalı.");
+      }
+      if (!question.options[question.correct_index]?.trim()) {
+        messages.push("Doğru cevap olarak işaretlenen seçenek doldurulmalı.");
+      }
+    }
+    return messages;
+  };
+
+  const bulkQuestionValid = (question) =>
+    bulkQuestionValidationMessages(question).length === 0;
+
+  const saveBulkQuestions = async () => {
+    const questionsToSave = bulkQuestions.filter(bulkQuestionStarted);
+    if (!questionsToSave.length || questionsToSave.some((question) => !bulkQuestionValid(question))) {
+      toast.error("Doldurulan tüm soruları kontrol edin");
+      return;
+    }
+
+    setBulkSaving(true);
+    try {
+      const payload = questionsToSave.map((question) => {
+        const filledOptions = question.options
+          .map((option, originalIndex) => ({ option, originalIndex }))
+          .filter(({ option }) => option.trim());
+        return {
+          ...question,
+          options:
+            question.qtype === "free_text"
+              ? []
+              : filledOptions.map(({ option }) => option),
+          correct_index:
+            question.qtype === "free_text"
+              ? null
+              : filledOptions.findIndex(
+                  ({ originalIndex }) => originalIndex === question.correct_index,
+                ),
+        };
+      });
+      await api.post("/questions/bulk", { questions: payload });
+      setBulkModal(false);
+      setBulkQuestions([]);
+      toast.success(`${payload.length} soru havuza eklendi`);
+      await load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || e.response?.data?.error || "Sorular kaydedilemedi");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const openEdit = (q) => {
+    const currentCategory = categories.find((category) => category.id === q.category_id);
     setForm({
       text: q.text,
       qtype: q.qtype,
       options: q.options?.length ? q.options : ["", ""],
       correct_index: q.correct_index ?? 0,
-      category_id: q.category_id || "",
+      category_id: currentCategory?.isDefault ? "" : (q.category_id || ""),
     });
     setModal(q);
   };
@@ -262,6 +403,9 @@ export default function QuestionsPage() {
             <button data-testid="add-category-btn" className={btnSecondary} onClick={openNewCategory}>
               <span className="flex items-center gap-2"><FolderPlus className="w-4 h-4" /> Kategori Ekle</span>
             </button>
+            <button data-testid="add-bulk-questions-btn" className={btnSecondary} onClick={openBulkQuestions}>
+              <span className="flex items-center gap-2"><ListPlus className="w-4 h-4" /> Toplu Soru Ekle</span>
+            </button>
             <button
               data-testid="add-question-btn"
               className={btnPrimary}
@@ -399,15 +543,177 @@ export default function QuestionsPage() {
         </div>
       )}
 
+      <Dialog open={bulkModal} onOpenChange={(open) => { if (!bulkSaving) setBulkModal(open); }}>
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Toplu Soru Ekle</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <p className="text-sm text-slate-500">
+              En fazla 50 soruyu tek işlemde ekleyebilirsiniz. Tamamen boş bırakılan kartlar kaydedilmez.
+            </p>
+            {bulkQuestions.map((question, questionIndex) => (
+              <section key={question.draft_id} className="rounded-2xl border border-navy-900/10 bg-slate-50/70 p-4 sm:p-5">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-navy-950">Soru {questionIndex + 1}</h3>
+                  {bulkQuestions.length > 1 && (
+                    <button
+                      type="button"
+                      aria-label={`${questionIndex + 1}. soruyu kaldır`}
+                      onClick={() => setBulkQuestions((current) => current.filter((item) => item.draft_id !== question.draft_id))}
+                      className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-medium text-slate-500">Kategori</span>
+                    <select
+                      data-testid={`bulk-question-category-${questionIndex}`}
+                      className={inputCls}
+                      value={question.category_id}
+                      onChange={(e) => updateBulkQuestion(question.draft_id, { category_id: e.target.value })}
+                    >
+                      <option value="">Genel (varsayılan)</option>
+                      {categories.filter((category) => !category.isDefault).map((category) => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-medium text-slate-500">Soru tipi</span>
+                    <select
+                      data-testid={`bulk-question-type-${questionIndex}`}
+                      className={inputCls}
+                      value={question.qtype}
+                      onChange={(e) => updateBulkQuestion(question.draft_id, { qtype: e.target.value })}
+                    >
+                      <option value="multiple_choice">Çoktan Seçmeli</option>
+                      <option value="free_text">Serbest Metin</option>
+                    </select>
+                  </label>
+                </div>
+                <textarea
+                  data-testid={`bulk-question-text-${questionIndex}`}
+                  className={inputCls + " mt-3 min-h-[76px]"}
+                  placeholder="Soru metni"
+                  value={question.text}
+                  onChange={(e) => updateBulkQuestion(question.draft_id, { text: e.target.value })}
+                />
+                {question.qtype === "multiple_choice" && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs text-slate-400">Seçenekler — doğru cevabı işaretleyin</p>
+                    {question.options.map((option, optionIndex) => (
+                      <div key={optionIndex} className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name={`bulk-correct-${question.draft_id}`}
+                          checked={question.correct_index === optionIndex}
+                          onChange={() => updateBulkQuestion(question.draft_id, { correct_index: optionIndex })}
+                          className="accent-emerald-600"
+                        />
+                        <input
+                          className={inputCls}
+                          placeholder={`Seçenek ${optionIndex + 1}`}
+                          value={option}
+                          onChange={(e) => updateBulkOption(question.draft_id, optionIndex, e.target.value)}
+                        />
+                        {question.options.length > 2 && (
+                          <button
+                            type="button"
+                            aria-label="Seçeneği sil"
+                            onClick={() => updateBulkQuestion(question.draft_id, {
+                              options: question.options.filter((_, index) => index !== optionIndex),
+                              correct_index: 0,
+                            })}
+                            className="p-2 text-slate-300 hover:text-red-500"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => updateBulkQuestion(question.draft_id, { options: [...question.options, ""] })}
+                      className="text-sm font-medium text-brand-600 hover:underline"
+                    >
+                      + Seçenek ekle
+                    </button>
+                  </div>
+                )}
+                {bulkQuestionValidationMessages(question).length > 0 && (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-600 shadow-sm animate-in fade-in slide-in-from-top-1 duration-500">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-500" />
+                    <div>
+                      {bulkQuestionValidationMessages(question).map((message) => (
+                        <p key={message}>{message}</p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            ))}
+            <button
+              type="button"
+              data-testid="bulk-add-another-question"
+              disabled={bulkQuestions.length >= 50}
+              onClick={() => setBulkQuestions((current) => {
+                const previous = current[current.length - 1];
+                return [
+                  ...current,
+                  newBulkDraft(previous?.category_id || "", previous?.qtype || "multiple_choice"),
+                ];
+              })}
+              className="w-full rounded-xl border border-dashed border-brand-300 px-4 py-3 text-sm font-medium text-brand-700 hover:border-brand-500 hover:bg-brand-50/50 disabled:opacity-40"
+            >
+              + Başka bir soru ekle
+            </button>
+            <div className="sticky bottom-0 -mx-1 flex flex-col gap-3 rounded-xl border border-navy-900/10 bg-white/95 p-4 shadow-lg backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-sm text-slate-500">
+                {bulkQuestions.filter(bulkQuestionStarted).some((question) => !bulkQuestionValid(question)) ? (
+                  <span className="inline-flex items-center gap-1.5 text-slate-500 animate-in fade-in slide-in-from-bottom-1 duration-500">
+                    <Info className="h-3.5 w-3.5 text-sky-500" />
+                    Kaydetmeden önce eksik alanları tamamlayın.
+                  </span>
+                ) : (
+                  <>{bulkQuestions.filter(bulkQuestionStarted).length} soru kaydedilecek</>
+                )}
+              </span>
+              <button
+                data-testid="bulk-questions-save-btn"
+                className={btnPrimary + " sm:min-w-48"}
+                disabled={
+                  bulkSaving ||
+                  bulkQuestions.filter(bulkQuestionStarted).length === 0 ||
+                  bulkQuestions.filter(bulkQuestionStarted).some((question) => !bulkQuestionValid(question))
+                }
+                onClick={saveBulkQuestions}
+              >
+                {bulkSaving ? "Sorular kaydediliyor..." : "Soruları Kaydet"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!modal} onOpenChange={(open) => !open && setModal(null)}>
         <DialogContent className="rounded-2xl max-w-lg">
           <DialogHeader><DialogTitle>{modal?.question_id ? "Soruyu Düzenle" : "Yeni Soru"}</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
+            {!modal?.question_id && (
+              <div className="flex items-start gap-2 rounded-xl border border-sky-100 bg-sky-50/60 px-3.5 py-3 text-xs leading-relaxed text-slate-600">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-500" />
+                <span>Kategori seçmezseniz soru Genel kategorisine eklenir. Soru tipini seçip içeriği doldurarak başlayabilirsiniz.</span>
+              </div>
+            )}
             <label className="block space-y-1.5">
               <span className="text-xs font-medium text-slate-500">Kategori</span>
               <select data-testid="question-category-select" className={inputCls} value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}>
                 <option value="">Genel (varsayılan)</option>
-                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                {categories.filter((category) => !category.isDefault).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
             </label>
             <textarea data-testid="question-text-input" className={inputCls + " min-h-[80px]"} placeholder="Soru metni" value={form.text} onChange={(e) => setForm({ ...form, text: e.target.value })} />
@@ -415,6 +721,11 @@ export default function QuestionsPage() {
               <option value="multiple_choice">Çoktan Seçmeli</option>
               <option value="free_text">Serbest Metin</option>
             </select>
+            <p className="-mt-2 text-xs leading-relaxed text-slate-400">
+              {form.qtype === "multiple_choice"
+                ? "En az iki seçenek ekleyin ve doğru cevabı işaretleyin."
+                : "Serbest metin sorularında seçenek veya doğru cevap tanımlamanız gerekmez."}
+            </p>
             {form.qtype === "multiple_choice" && (
               <div className="space-y-2">
                 <p className="text-xs text-slate-400">Seçenekler — doğru cevabı işaretleyin</p>
@@ -430,7 +741,17 @@ export default function QuestionsPage() {
                 <button data-testid="add-option-btn" onClick={() => setForm({ ...form, options: [...form.options, ""] })} className="text-sm text-brand-600 font-medium hover:underline">+ Seçenek ekle</button>
               </div>
             )}
-            <button data-testid="question-save-btn" className={btnPrimary + " w-full"} disabled={!form.text.trim() || (form.qtype === "multiple_choice" && (form.options.filter((option) => option.trim()).length < 2 || !form.options[form.correct_index]?.trim()))} onClick={save}>
+            {bulkQuestionValidationMessages(form).length > 0 && (
+              <div className="flex items-start gap-2 rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-600 shadow-sm animate-in fade-in slide-in-from-top-1 duration-500">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-sky-500" />
+                <div>
+                  {bulkQuestionValidationMessages(form).map((message) => (
+                    <p key={message}>{message}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button data-testid="question-save-btn" className={btnPrimary + " w-full"} disabled={!bulkQuestionStarted(form) || !bulkQuestionValid(form)} onClick={save}>
               Kaydet
             </button>
           </div>
