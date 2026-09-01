@@ -3,10 +3,25 @@ import { api, fmtDate, STATUS_TR, STATUS_COLOR } from "@/lib/api";
 import { PageHeader } from "@/components/Layout";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, Trash2 } from "lucide-react";
+import { Info, Plus, Trash2 } from "lucide-react";
 
 const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
 const btnPrimary = "px-5 py-2.5 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow] disabled:opacity-40";
+const MAX_ASSIGNMENT_DATE_TIME = "9999-12-31T23:59";
+
+const toLocalMinute = (date = new Date()) => {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+};
+
+const addLocalMinute = (value) => {
+  const date = value ? new Date(value) : new Date();
+  date.setSeconds(0, 0);
+  date.setMinutes(date.getMinutes() + 1);
+  return toLocalMinute(date);
+};
+
+const hasFourDigitYear = (value) => !value || /^\d{4}-/.test(value);
 
 export default function AssignmentsPage() {
   const [assignments, setAssignments] = useState([]);
@@ -15,6 +30,9 @@ export default function AssignmentsPage() {
   const [groups, setGroups] = useState([]);
   const [modal, setModal] = useState(false);
   const [form, setForm] = useState({ training_id: "", user_ids: [], group_ids: [], start_at: "", due_at: "", reminder_days: 0 });
+  const [minimumDateTime, setMinimumDateTime] = useState(toLocalMinute);
+  const [startDateFeedback, setStartDateFeedback] = useState("");
+  const [dueDateFeedback, setDueDateFeedback] = useState("");
 
   const load = useCallback(() => {
     api.get("/assignments").then((r) => setAssignments(r.data));
@@ -23,10 +41,75 @@ export default function AssignmentsPage() {
     api.get("/groups").then((r) => setGroups(r.data));
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!modal) return undefined;
+    const refreshMinimum = () => setMinimumDateTime(toLocalMinute());
+    refreshMinimum();
+    const timer = window.setInterval(refreshMinimum, 30_000);
+    return () => window.clearInterval(timer);
+  }, [modal]);
 
   const toggle = (key, id) => setForm((f) => ({ ...f, [key]: f[key].includes(id) ? f[key].filter((x) => x !== id) : [...f[key], id] }));
 
+  const changeStartAt = (value) => {
+    const currentMinimum = toLocalMinute();
+    setMinimumDateTime(currentMinimum);
+    if (!hasFourDigitYear(value)) {
+      setStartDateFeedback("Yıl en fazla 4 basamaklı olabilir.");
+      return;
+    }
+    if (value && value < currentMinimum) {
+      setStartDateFeedback("Geçmiş bir başlangıç tarihi seçilemez.");
+      return;
+    }
+    setStartDateFeedback("");
+    setDueDateFeedback("");
+    setForm((current) => ({
+      ...current,
+      start_at: value,
+      ...(current.due_at && current.due_at < addLocalMinute(value || currentMinimum)
+        ? { due_at: "", reminder_days: 0 }
+        : {}),
+    }));
+  };
+
+  const changeDueAt = (value) => {
+    const currentMinimum = toLocalMinute();
+    const earliestDueAt = addLocalMinute(form.start_at || currentMinimum);
+    setMinimumDateTime(currentMinimum);
+    if (!hasFourDigitYear(value)) {
+      setDueDateFeedback("Yıl en fazla 4 basamaklı olabilir.");
+      return;
+    }
+    if (value && value < earliestDueAt) {
+      setDueDateFeedback(
+        form.start_at
+          ? "Son tarih başlangıç tarihinden sonra olmalı."
+          : "Geçmiş bir son tarih seçilemez.",
+      );
+      return;
+    }
+    setDueDateFeedback("");
+    setForm((current) => ({
+      ...current,
+      due_at: value,
+      ...(!value ? { reminder_days: 0 } : {}),
+    }));
+  };
+
   const create = async () => {
+    const currentMinimum = toLocalMinute();
+    if (form.start_at && (!hasFourDigitYear(form.start_at) || form.start_at < currentMinimum)) {
+      toast.error("Başlangıç tarihi geçmişte olamaz ve yıl 4 basamaklı olmalıdır");
+      return;
+    }
+    if (
+      form.due_at &&
+      (!hasFourDigitYear(form.due_at) || form.due_at < addLocalMinute(form.start_at || currentMinimum))
+    ) {
+      toast.error("Son tarih gelecekte ve başlangıç tarihinden sonra olmalıdır");
+      return;
+    }
     try {
       const payload = {
         ...form,
@@ -38,6 +121,8 @@ export default function AssignmentsPage() {
       toast.success(`${res.data.created} atama oluşturuldu. Uygulama içi bildirimler planlandı`);
       setModal(false);
       setForm({ training_id: "", user_ids: [], group_ids: [], start_at: "", due_at: "", reminder_days: 0 });
+      setStartDateFeedback("");
+      setDueDateFeedback("");
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Atama oluşturulamadı");
@@ -104,7 +189,16 @@ export default function AssignmentsPage() {
         </table>
       </div>
 
-      <Dialog open={modal} onOpenChange={setModal}>
+      <Dialog
+        open={modal}
+        onOpenChange={(open) => {
+          setModal(open);
+          if (!open) {
+            setStartDateFeedback("");
+            setDueDateFeedback("");
+          }
+        }}
+      >
         <DialogContent className="rounded-2xl max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Yeni Atama</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
@@ -141,16 +235,31 @@ export default function AssignmentsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <p className="text-xs text-slate-400 mb-1.5">Başlangıç (boş = hemen)</p>
-                <input data-testid="assignment-start-input" type="datetime-local" className={inputCls} value={form.start_at} onChange={(e) => setForm({ ...form, start_at: e.target.value })} />
+                <input data-testid="assignment-start-input" type="datetime-local" min={minimumDateTime} max={MAX_ASSIGNMENT_DATE_TIME} step="60" className={inputCls} value={form.start_at} onChange={(e) => changeStartAt(e.target.value)} />
+                {startDateFeedback && (
+                  <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-amber-700 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                    {startDateFeedback}
+                  </p>
+                )}
               </div>
               <div>
                 <p className="text-xs text-slate-400 mb-1.5">Son tarih (opsiyonel)</p>
-                <input data-testid="assignment-due-input" type="datetime-local" className={inputCls} value={form.due_at} onChange={(e) => setForm({ ...form, due_at: e.target.value, ...(!e.target.value ? { reminder_days: 0 } : {}) })} />
+                <input data-testid="assignment-due-input" type="datetime-local" min={addLocalMinute(form.start_at || minimumDateTime)} max={MAX_ASSIGNMENT_DATE_TIME} step="60" className={inputCls} value={form.due_at} onChange={(e) => changeDueAt(e.target.value)} />
+                {dueDateFeedback && (
+                  <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-amber-700 animate-in fade-in slide-in-from-top-1 duration-300">
+                    <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" />
+                    {dueDateFeedback}
+                  </p>
+                )}
               </div>
             </div>
             <div>
-              <p className="text-xs text-slate-400 mb-1.5">Son N gün boyunca günlük hatırlatma (0 = kapalı)</p>
+              <p className="text-xs font-medium text-slate-500 mb-1.5">Son tarihten kaç gün önce hatırlatmalar başlasın?</p>
               <input data-testid="assignment-reminder-input" type="number" min="0" max="365" disabled={!form.due_at} className={inputCls} value={form.reminder_days} onChange={(e) => setForm({ ...form, reminder_days: e.target.value })} />
+              <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                Kullanıcıya son tarihe kalan gün sayısıyla birlikte günlük uygulama içi bildirim gösterilir. Örneğin 3 seçerseniz 3, 2 ve 1 gün kala hatırlatma yapılır; 0 seçerseniz kapatılır.
+              </p>
             </div>
             <button data-testid="assignment-create-btn" className={btnPrimary + " w-full"} disabled={!form.training_id || (form.user_ids.length === 0 && form.group_ids.length === 0)} onClick={create}>
               Atamayı Oluştur

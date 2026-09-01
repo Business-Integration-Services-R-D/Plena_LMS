@@ -970,7 +970,7 @@ const routes = [
     method: "POST",
     pattern: /^\/assignments$/,
     handler: async (_m, body) => {
-      const startsAt = body.start_at || new Date().toISOString();
+      const startsAt = body.start_at || null;
       const dueAt = body.due_at || null;
       let created = 0;
       for (const userId of body.user_ids || []) {
