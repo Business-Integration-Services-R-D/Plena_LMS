@@ -29,7 +29,7 @@ async function loadQuizQuestions(settings: ExamSettings) {
 }
 
 /** Test ekranını açmadan önceki tüm kuralları doğrular. */
-async function loadGate(userId: string, courseId: string) {
+async function loadGate(userId: string, courseId: string, role: Role) {
   const enrollment = await prisma.enrollment.findUnique({
     where: { userId_courseId: { userId, courseId } },
     include: { course: { include: { exam: true } } },
@@ -37,6 +37,10 @@ async function loadGate(userId: string, courseId: string) {
 
   if (!enrollment) {
     return { error: "Bu eğitim size atanmamış", status: 403 as const };
+  }
+
+  if (!enrollment.course.active && role !== Role.ADMIN) {
+    return { error: "Bu eğitim pasif durumda", status: 403 as const };
   }
 
   const settings = resolveExamSettings(enrollment.course, enrollment.course.exam);
@@ -54,7 +58,7 @@ export async function GET(
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id: courseId } = await params;
-  const gate = await loadGate(session.id, courseId);
+  const gate = await loadGate(session.id, courseId, session.role);
   if ("error" in gate) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }
@@ -107,7 +111,7 @@ export async function POST(
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const { id: courseId } = await params;
-  const gate = await loadGate(session.id, courseId);
+  const gate = await loadGate(session.id, courseId, session.role);
   if ("error" in gate) {
     return NextResponse.json({ error: gate.error }, { status: gate.status });
   }

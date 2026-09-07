@@ -3,6 +3,7 @@ import { AuditAction, Role, ScoringMode } from "@prisma/client";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
+import { syncEnrollmentsForAssignment } from "@/lib/enrollment";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -82,8 +83,28 @@ export async function PATCH(
     }
   }
 
+  // Eğitim yeniden açılırken, pasif olduğu sırada değişen grup üyeliklerini
+  // mevcut atamalarla tekrar eşitle. Geçmiş ilerleme kayıtları upsert ile korunur.
+  if (parsed.data.active === true && course.active === false) {
+    const assignments = await prisma.assignment.findMany({
+      where: { courseId: id },
+      select: { id: true },
+    });
+    for (const assignment of assignments) {
+      await syncEnrollmentsForAssignment(assignment.id);
+    }
+  }
+
+  const activeChanged =
+    parsed.data.active !== undefined && parsed.data.active !== course.active;
+  const auditAction = activeChanged
+    ? parsed.data.active
+      ? AuditAction.ADMIN_REACTIVATED_COURSE
+      : AuditAction.ADMIN_DEACTIVATED_COURSE
+    : AuditAction.ADMIN_UPDATED_COURSE;
+
   await recordAudit({
-    action: AuditAction.ADMIN_UPDATED_COURSE,
+    action: auditAction,
     actor: session,
     entityType: "Course",
     entityId: updated.id,

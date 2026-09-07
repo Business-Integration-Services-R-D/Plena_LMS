@@ -35,6 +35,8 @@ const ACTION_TR: Record<string, string> = {
   ADMIN_SENT_ACTIVATION: "Aktivasyon gönderildi",
   ADMIN_CREATED_COURSE: "Eğitim oluşturuldu",
   ADMIN_UPDATED_COURSE: "Eğitim güncellendi",
+  ADMIN_DEACTIVATED_COURSE: "Eğitim pasife alındı",
+  ADMIN_REACTIVATED_COURSE: "Eğitim yeniden aktifleştirildi",
   ADMIN_CREATED_GROUP: "Ekip oluşturuldu",
   ADMIN_UPDATED_GROUP: "Ekip güncellendi",
   ADMIN_ADDED_GROUP_MEMBER: "Ekibe üye eklendi",

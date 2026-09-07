@@ -52,7 +52,9 @@ export default function ReportsPage() {
 
   useEffect(() => {
     api.get("/reports/overview").then((r) => setOverview(r.data));
-    api.get("/trainings").then((r) => setTrainings(r.data));
+    // Rapor geçmişi eğitim pasife alındığında da korunur; filtrede aktif ve
+    // pasif eğitimlerin tamamı seçilebilir olmalıdır.
+    api.get("/trainings?status=all").then((r) => setTrainings(r.data));
     api.get("/users").then((r) => setUsers(r.data.filter((user) => user.role === "employee")));
   }, []);
 
@@ -151,7 +153,7 @@ export default function ReportsPage() {
                   ))
                 : trainings.map((training) => (
                     <option key={training.training_id} value={training.training_id}>
-                      {training.title}
+                      {training.title}{training.active ? "" : " · Pasif"}
                     </option>
                   ))}
             </select>
