@@ -20,6 +20,7 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
   const [seekBlocked, setSeekBlocked] = useState(false);
   const [retryMsg, setRetryMsg] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFallbackFullscreen, setIsFallbackFullscreen] = useState(false);
   const startedRef = useRef(false);
 
   const dur = duration || videoRef.current?.duration || 0;
@@ -53,16 +54,38 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
   }, []);
 
   useEffect(() => {
+    const video = videoRef.current;
     const handleFullscreenChange = () => {
       setIsFullscreen(Boolean(document.fullscreenElement || document.webkitFullscreenElement));
     };
+    const handleNativeFullscreenStart = () => setIsFullscreen(true);
+    const handleNativeFullscreenEnd = () => setIsFullscreen(false);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    video?.addEventListener("webkitbeginfullscreen", handleNativeFullscreenStart);
+    video?.addEventListener("webkitendfullscreen", handleNativeFullscreenEnd);
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
       document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      video?.removeEventListener("webkitbeginfullscreen", handleNativeFullscreenStart);
+      video?.removeEventListener("webkitendfullscreen", handleNativeFullscreenEnd);
     };
   }, []);
+
+  // Fullscreen API sunmayan mobil tarayıcılarda oynatıcıyı viewport'a sabitle.
+  useEffect(() => {
+    if (!isFallbackFullscreen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setIsFallbackFullscreen(false);
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isFallbackFullscreen]);
 
   // checkpoint countdown
   useEffect(() => {
@@ -78,6 +101,11 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
   const openCheckpoint = useCallback((cp) => {
     const v = videoRef.current;
     v.pause();
+    // iOS'un native video tam ekranında HTML checkpoint katmanı görünmez.
+    // Soruyu gösterebilmek için kontrol noktasında native tam ekrandan çık.
+    if (v.webkitDisplayingFullscreen && v.webkitExitFullscreen) {
+      v.webkitExitFullscreen();
+    }
     activeCpRef.current = cp;
     setActiveCp(cp);
     setAnswer({ index: null, text: "" });
@@ -192,15 +220,54 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
 
   const toggleFullscreen = async () => {
     const player = playerRef.current;
-    if (!player) return;
+    const video = videoRef.current;
+    if (!player || !video) return;
 
     if (document.fullscreenElement || document.webkitFullscreenElement) {
-      const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen;
+      const exitFullscreen =
+        document.exitFullscreen ||
+        document.webkitExitFullscreen ||
+        document.webkitCancelFullScreen;
       await exitFullscreen?.call(document);
-    } else {
-      const requestFullscreen = player.requestFullscreen || player.webkitRequestFullscreen;
-      await requestFullscreen?.call(player);
+      return;
     }
+
+    if (video.webkitDisplayingFullscreen && video.webkitExitFullscreen) {
+      video.webkitExitFullscreen();
+      return;
+    }
+
+    if (isFallbackFullscreen) {
+      setIsFallbackFullscreen(false);
+      return;
+    }
+
+    const requestFullscreen =
+      player.requestFullscreen ||
+      player.webkitRequestFullscreen ||
+      player.msRequestFullscreen;
+
+    if (requestFullscreen) {
+      try {
+        await requestFullscreen.call(player);
+        return;
+      } catch {
+        // Bazı mobil Safari sürümleri yalnızca video elementinin native
+        // tam ekran yöntemine izin verir; aşağıdaki yola devam et.
+      }
+    }
+
+    if (video.webkitEnterFullscreen) {
+      try {
+        video.webkitEnterFullscreen();
+        return;
+      } catch {
+        // Metadata henüz hazır değilse veya tarayıcı yöntemi reddederse
+        // viewport tabanlı yedek tam ekran kullanılır.
+      }
+    }
+
+    setIsFallbackFullscreen(true);
   };
 
   const handleBarClick = (e) => {
@@ -225,11 +292,12 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
   };
 
   const q = activeCp?.question;
+  const fullscreenActive = isFullscreen || isFallbackFullscreen;
 
   return (
     <div
       ref={playerRef}
-      className={`relative overflow-hidden bg-black shadow-[0_20px_60px_rgba(14,32,51,0.18)] ${isFullscreen ? "h-screen flex items-center rounded-none" : "rounded-2xl"}`}
+      className={`relative overflow-hidden bg-black shadow-[0_20px_60px_rgba(14,32,51,0.18)] ${isFallbackFullscreen ? "fixed inset-0 z-[100] flex h-[100dvh] items-center rounded-none" : isFullscreen ? "flex h-[100dvh] items-center rounded-none" : "rounded-2xl"}`}
       data-testid="video-player"
     >
       <video
@@ -296,9 +364,10 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
               data-testid="video-fullscreen-btn"
               onClick={toggleFullscreen}
               className="text-white/70 hover:text-white transition-colors shrink-0"
-              aria-label={isFullscreen ? "Tam ekrandan çık" : "Tam ekran"}
+              aria-label={fullscreenActive ? "Tam ekrandan çık" : "Tam ekran"}
+              aria-pressed={fullscreenActive}
             >
-              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+              {fullscreenActive ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
             </button>
           </div>
         </div>
