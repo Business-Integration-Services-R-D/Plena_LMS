@@ -185,7 +185,7 @@ export default function WatchPage() {
           <div className="n-card p-6 flex items-center gap-3 flex-wrap">
             <CheckCircle2 className="w-5 h-5 text-emerald-500" />
             <p className="text-sm text-slate-700">Eğitim içeriği tamamlandı. Sınavı bitirerek eğitimi tamamlayın.{quiz.pass_score ? ` Geçme notu: %${quiz.pass_score}` : ""}</p>
-            <p className="text-xs text-slate-400 ml-auto">Cevaplarınız bu tarayıcıda saklanır; sayfayı yenilerseniz kaybolmaz</p>
+            <p className="w-full text-left text-xs text-slate-400">Cevaplarınız bu tarayıcıda saklanır; sayfayı yenilerseniz kaybolmaz</p>
           </div>
           {quiz.questions.map((q, i) => (
             <div key={q.question_id} className="n-card p-8" data-testid={`quiz-question-${i}`}>

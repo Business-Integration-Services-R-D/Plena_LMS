@@ -7,12 +7,14 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Eye, FileText, Search } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock, ChevronLeft, ChevronRight, ChevronsUpDown, Eye, FileText, Search } from "lucide-react";
 
 const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
 
 // Sınavın toplam puanı; soru puanlarının toplamı bunu geçemez.
 const MAX_TOTAL_POINTS = 100;
+const PASS_SCORE_OPTIONS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
 // Soru puanı 1-100 arası tam sayı; boş/gecersiz giriş 1 sayılır.
 const clampPoints = (value) => {
@@ -76,17 +78,6 @@ export default function TrainingDetailPage() {
   const [bankQuestionSaving, setBankQuestionSaving] = useState(false);
   const fileRef = useRef(null);
   const previewRef = useRef(null);
-  const passScoreRef = useRef(null);
-
-  // Hazır oran listesini açar; showPicker desteklenmeyen tarayıcıda alana odaklanır.
-  const openPassScoreOptions = () => {
-    const input = passScoreRef.current;
-    if (!input) return;
-    input.focus();
-    try {
-      input.showPicker?.();
-    } catch {}
-  };
 
   const load = useCallback(() => {
     api.get(`/trainings/${trainingId}`).then((r) => setTraining(r.data));
@@ -403,6 +394,25 @@ export default function TrainingDetailPage() {
   const selectedQuizCategory = questionCategories.find(
     (category) => category.id === quizCategoryFilter,
   );
+  const selectedCategoryQuestions = quizCategoryFilter === "all"
+    ? []
+    : questions.filter((question) => question.category_id === quizCategoryFilter);
+  const selectedCategoryQuestionIds = selectedCategoryQuestions.map(
+    (question) => question.question_id,
+  );
+  const allSelectedCategoryQuestionsSelected =
+    selectedCategoryQuestionIds.length > 0 &&
+    selectedCategoryQuestionIds.every((questionId) => selectedIds.includes(questionId));
+
+  const toggleAllSelectedCategoryQuestions = () => {
+    const categoryIds = new Set(selectedCategoryQuestionIds);
+    setSelectedIds((current) => {
+      if (allSelectedCategoryQuestionsSelected) {
+        return current.filter((questionId) => !categoryIds.has(questionId));
+      }
+      return [...new Set([...current, ...selectedCategoryQuestionIds])];
+    });
+  };
   const isPdf = training.content_type === "pdf";
   const fmtPosition = (value) => isPdf ? `Sayfa ${value}` : fmtTime(value);
 
@@ -844,29 +854,33 @@ export default function TrainingDetailPage() {
                 Geçme notu uygula
               </label>
               {passEnabled && (
-                <div className="flex items-center gap-2">
-                  <div className="relative">
-                    {/* Tarayıcının datalist oku gizlenip yerine tasarımla uyumlu chevron konur. */}
-                    <input data-testid="quiz-pass-score-input" type="number" min="0" max="100" step="10" list="pass-score-options"
-                      ref={passScoreRef}
-                      className={inputCls + " w-24 pr-8 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-calendar-picker-indicator]:hidden"}
-                      placeholder="%"
-                      value={training.quiz?.pass_score ?? ""} onChange={(e) => setPassScore(e.target.value)} />
-                    <button
-                      type="button"
-                      tabIndex={-1}
-                      aria-label="Hazır oranlar"
-                      onClick={openPassScoreOptions}
-                      className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                      <ChevronDown className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <datalist id="pass-score-options">
-                    {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((v) => <option key={v} value={v} />)}
-                  </datalist>
-                  <span className="text-sm text-slate-400">%</span>
-                </div>
+                <Select
+                  value={training.quiz?.pass_score != null ? String(training.quiz.pass_score) : ""}
+                  onValueChange={setPassScore}
+                >
+                  <SelectTrigger
+                    data-testid="quiz-pass-score-input"
+                    aria-label="Geçme notu"
+                    className="h-[42px] w-28 rounded-xl border-navy-900/10 bg-white px-4 text-sm font-medium text-navy-950 shadow-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-0"
+                  >
+                    <SelectValue placeholder="Oran seçin" />
+                  </SelectTrigger>
+                  <SelectContent
+                    position="popper"
+                    sideOffset={6}
+                    className="z-[70] rounded-xl border-navy-900/10 bg-white p-1.5 text-navy-950 shadow-[0_18px_45px_-18px_rgba(14,32,51,0.28)]"
+                  >
+                    {PASS_SCORE_OPTIONS.map((value) => (
+                      <SelectItem
+                        key={value}
+                        value={String(value)}
+                        className="rounded-lg py-2.5 pl-3 pr-9 text-sm font-medium cursor-pointer focus:bg-brand-50 focus:text-navy-950"
+                      >
+                        %{value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
           </div>
@@ -882,9 +896,24 @@ export default function TrainingDetailPage() {
                 onChange={(e) => setQuizQuestionSearch(e.target.value)}
               />
             </div>
-            {(quizQuestionSearch || quizCategoryFilter !== "all") && (
-              <span className="text-xs text-slate-400">{filteredQuizQuestions.length} soru gösteriliyor</span>
-            )}
+            <div className="flex items-center justify-end gap-3">
+              {(quizQuestionSearch || quizCategoryFilter !== "all") && (
+                <span className="text-xs text-slate-400">{filteredQuizQuestions.length} soru gösteriliyor</span>
+              )}
+              {quizCategoryFilter !== "all" && (
+                <button
+                  type="button"
+                  data-testid="quiz-category-select-all"
+                  disabled={selectedCategoryQuestionIds.length === 0}
+                  onClick={toggleAllSelectedCategoryQuestions}
+                  title={`${selectedQuizCategory?.name || "Seçili kategori"} kategorisindeki tüm soruları ${allSelectedCategoryQuestionsSelected ? "seçimden kaldır" : "seç"}`}
+                  className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${allSelectedCategoryQuestionsSelected ? "border-brand-500 bg-brand-50 text-brand-700" : "border-navy-900/10 bg-white text-navy-950 hover:border-brand-500 hover:text-brand-700"}`}
+                >
+                  <CheckCircle2 className={`h-4 w-4 ${allSelectedCategoryQuestionsSelected ? "text-brand-600" : "text-slate-400"}`} />
+                  {allSelectedCategoryQuestionsSelected ? "Seçimi Kaldır" : "Tümünü Seç"}
+                </button>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {questions.length === 0 && <p className="text-sm text-slate-400">Soru havuzu boş. Önce <Link to="/admin/questions" className="text-brand-600 hover:underline">soru ekleyin</Link>.</p>}
