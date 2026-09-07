@@ -69,7 +69,11 @@ export async function syncEnrollmentsForGroupMember(
   userId: string,
 ) {
   const assignments = await prisma.assignment.findMany({
-    where: { target: AssignmentTarget.GROUP, groupId },
+    where: {
+      target: AssignmentTarget.GROUP,
+      groupId,
+      course: { active: true },
+    },
   });
 
   for (const assignment of assignments) {

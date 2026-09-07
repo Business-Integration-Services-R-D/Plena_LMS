@@ -108,6 +108,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const course = await prisma.course.findUnique({
+    where: { id: courseId },
+    select: { active: true },
+  });
+  if (!course) {
+    return NextResponse.json({ error: "Eğitim bulunamadı" }, { status: 404 });
+  }
+  if (!course.active) {
+    return NextResponse.json(
+      { error: "Pasif eğitime yeni atama yapılamaz" },
+      { status: 409 },
+    );
+  }
+
   const assignment = await prisma.assignment.upsert({
     where:
       target === "USER"

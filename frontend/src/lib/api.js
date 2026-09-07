@@ -45,9 +45,10 @@ export const toUiUser = (u) =>
 // edu_module EnrollmentStatus -> Emergent UI assignment status
 const toUiStatus = (status, videoCompleted) => {
   if (status === "COMPLETED") return "completed";
+  if (status === "OVERDUE") return "overdue";
   if (videoCompleted) return "video_completed";
   if (status === "NOT_STARTED") return "assigned";
-  return "in_progress"; // IN_PROGRESS, FAILED (video sıfırlanmış), OVERDUE
+  return "in_progress"; // IN_PROGRESS, FAILED (video sıfırlanmış)
 };
 
 const mapReportRow = (r) => ({
@@ -115,6 +116,7 @@ const mapCheckpoint = (cp) => ({
 
 const mapCourse = (c) => ({
   training_id: c.id,
+  active: c.active !== false,
   title: c.title,
   description: c.description,
   video_filename: c.video?.fileName || null,
@@ -820,9 +822,16 @@ const routes = [
   {
     method: "GET",
     pattern: /^\/trainings$/,
-    handler: async () => {
+    handler: async (_m, _body, query) => {
       const res = await http.get("/admin/courses");
-      return res.data.filter((c) => c.active !== false).map(mapCourse);
+      const status = query.get("status") || "active";
+      return res.data
+        .filter((course) => {
+          if (status === "all") return true;
+          if (status === "inactive") return course.active === false;
+          return course.active !== false;
+        })
+        .map(mapCourse);
     },
   },
   {
@@ -887,6 +896,16 @@ const routes = [
       // Rapor/denetim geçmişi korunması için soft delete.
       await http.patch(`/admin/courses/${m[1]}`, { active: false });
       return { ok: true };
+    },
+  },
+  {
+    method: "PATCH",
+    pattern: /^\/trainings\/([^/]+)\/status$/,
+    handler: async (m, body) => {
+      const res = await http.patch(`/admin/courses/${m[1]}`, {
+        active: Boolean(body.active),
+      });
+      return { ok: true, active: res.data.active };
     },
   },
   {
@@ -1585,6 +1604,7 @@ export const STATUS_TR = {
   in_progress: "Devam Ediyor",
   video_completed: "İçerik Tamamlandı",
   completed: "Eğitim Tamamlandı",
+  overdue: "Süresi Doldu",
 };
 
 export const STATUS_COLOR = {
@@ -1592,4 +1612,5 @@ export const STATUS_COLOR = {
   in_progress: "bg-brand-50 text-brand-700",
   video_completed: "bg-amber-50 text-amber-600",
   completed: "bg-emerald-50 text-emerald-600",
+  overdue: "bg-red-50 text-red-600",
 };

@@ -32,6 +32,12 @@ export async function GET(
   let video = enrollment?.course.video ?? null;
 
   if (enrollment) {
+    if (!enrollment.course.active && session.role !== Role.ADMIN) {
+      return NextResponse.json(
+        { error: "Bu eğitim pasif durumda" },
+        { status: 403 },
+      );
+    }
     const window = checkWindow(enrollment);
     if (!window.open) {
       return NextResponse.json({ error: window.reason }, { status: 403 });

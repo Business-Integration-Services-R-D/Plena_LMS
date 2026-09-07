@@ -3,10 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { api, fmtTime, fmtDate } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { PlayCircle, CheckCircle2, Clock, FileQuestion, FileText } from "lucide-react";
+import { PlayCircle, CheckCircle2, Clock, FileQuestion, FileText, CircleAlert } from "lucide-react";
 import { MartiBadge } from "@/components/brand/MartiMark";
 import { WaveLine, OceanBanner } from "@/components/brand/Decoration";
 import { HeroBanner } from "@/components/brand/HeroBanner";
+
+const isExpiredTraining = (assignment) => {
+  if (!assignment || assignment.status === "completed") return false;
+  if (assignment.status === "overdue") return true;
+  return Boolean(
+    assignment.due_at && new Date(assignment.due_at).getTime() < Date.now(),
+  );
+};
 
 export default function MyTrainingsPage() {
   const { user } = useAuth();
@@ -65,6 +73,7 @@ export default function MyTrainingsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
         {assignments.map((a, i) => {
           const done = a.status === "completed";
+          const expired = isExpiredTraining(a);
           return (
             <div
               key={a.assignment_id}
@@ -75,11 +84,11 @@ export default function MyTrainingsPage() {
             >
               <OceanBanner className="h-20 rounded-none shrink-0">
                 <div className="relative z-10 h-full flex items-center justify-between px-5">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ring-1 ${done ? "bg-emerald-400/90 text-white ring-emerald-300/40" : "bg-white/[0.14] text-cyan-200 ring-white/20"}`}>
-                    {done ? <CheckCircle2 className="w-5 h-5" /> : <PlayCircle className="w-5 h-5" />}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ring-1 ${done ? "bg-emerald-400/90 text-white ring-emerald-300/40" : expired ? "bg-red-500/90 text-white ring-red-300/40" : "bg-white/[0.14] text-cyan-200 ring-white/20"}`}>
+                    {done ? <CheckCircle2 className="w-5 h-5" /> : expired ? <CircleAlert className="w-5 h-5" /> : <PlayCircle className="w-5 h-5" />}
                   </div>
-                  <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium backdrop-blur-sm ${done ? "bg-emerald-400/90 text-white" : a.status === "assigned" ? "bg-white/[0.14] text-white ring-1 ring-white/20" : "bg-cyan-400/90 text-navy-950"}`}>
-                    {done ? "Eğitim Tamamlandı" : a.status === "assigned" ? "Başlamadı" : a.status === "video_completed" ? "Sınav Bekliyor" : "Devam Ediyor"}
+                  <span className={`px-2.5 py-1 rounded-full text-[11px] font-medium backdrop-blur-sm ${done ? "bg-emerald-400/90 text-white" : expired ? "bg-red-500/95 text-white ring-1 ring-red-300/40" : a.status === "assigned" ? "bg-white/[0.14] text-white ring-1 ring-white/20" : "bg-cyan-400/90 text-navy-950"}`}>
+                    {done ? "Eğitim Tamamlandı" : expired ? "Süresi Doldu" : a.status === "assigned" ? "Başlamadı" : a.status === "video_completed" ? "Sınav Bekliyor" : "Devam Ediyor"}
                   </span>
                 </div>
               </OceanBanner>
@@ -118,22 +127,48 @@ export default function MyTrainingsPage() {
 
       {/* Tamamlanmamış eğitime tıklanınca bilgilendirme popup'ı */}
       <Dialog open={!!infoModal} onOpenChange={(o) => !o && setInfoModal(null)}>
-        <DialogContent className="rounded-2xl max-w-md" data-testid="training-info-modal">
-          <DialogHeader>
-            <DialogTitle>{infoModal?.training_title}</DialogTitle>
+        <DialogContent className="rounded-2xl max-w-md border-navy-900/10 bg-white shadow-[0_28px_80px_-24px_rgba(14,32,51,0.38)]" data-testid="training-info-modal">
+          <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${isExpiredTraining(infoModal) ? "bg-red-50 text-red-600" : "bg-brand-50 text-brand-700"}`}>
+            {isExpiredTraining(infoModal) ? <CircleAlert className="h-5 w-5" /> : <PlayCircle className="h-5 w-5" />}
+          </div>
+          <DialogHeader className="text-left">
+            <DialogTitle className="text-xl tracking-tight text-navy-950">
+              {isExpiredTraining(infoModal) ? "Eğitimin süresi doldu" : infoModal?.training_title}
+            </DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-slate-600 leading-relaxed mt-2">{infoText(infoModal)}</p>
-          <button
-            data-testid="continue-training-btn"
-            className="w-full mt-4 py-3 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow]"
-            onClick={() => {
-              const id = infoModal.assignment_id;
-              setInfoModal(null);
-              navigate(`/trainings/${id}/watch`);
-            }}
-          >
-            Eğitime devam et
-          </button>
+          {isExpiredTraining(infoModal) ? (
+            <>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                <span className="font-medium text-navy-950">{infoModal?.training_title}</span> eğitimini tamamlamak için tanımlanan süre sona erdi. Eğitime devam edebilmek için yöneticinizden son tarihi güncellemesini veya eğitimi yeniden atamasını isteyin.
+              </p>
+              <p className="rounded-xl border border-navy-900/5 bg-[#F5F8FA] px-4 py-3 text-sm leading-relaxed text-slate-500">
+                Bu eğitimdeki mevcut ilerlemeniz ve sınav kayıtlarınız korunmaktadır.
+              </p>
+              <button
+                type="button"
+                data-testid="expired-training-close-btn"
+                className="w-full mt-2 py-3 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow]"
+                onClick={() => setInfoModal(null)}
+              >
+                Anladım
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-slate-600 leading-relaxed mt-2">{infoText(infoModal)}</p>
+              <button
+                data-testid="continue-training-btn"
+                className="w-full mt-4 py-3 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow]"
+                onClick={() => {
+                  const id = infoModal.assignment_id;
+                  setInfoModal(null);
+                  navigate(`/trainings/${id}/watch`);
+                }}
+              >
+                Eğitime devam et
+              </button>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
