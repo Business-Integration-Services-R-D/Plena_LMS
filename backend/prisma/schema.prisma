@@ -106,33 +106,52 @@ enum NotificationKind {
   DUE_REMINDER
 }
 
+enum VideoProcessingStatus {
+  READY
+  QUEUED
+  PROCESSING
+  OPTIMIZED
+  FAILED
+  SKIPPED
+}
+
+enum VideoCompressionJobStatus {
+  QUEUED
+  PROCESSING
+  CLEANUP_PENDING
+  COMPLETED
+  SKIPPED
+  FAILED
+  STALE
+}
+
 // ---------------------------------------------------------------------------
 // 1) Kullanıcılar
 // ---------------------------------------------------------------------------
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  passwordHash  String
-  role          Role      @default(USER)
-  sessionVersion Int      @default(0)
-  active        Boolean   @default(true)
-  deletedAt     DateTime?
-  deactivatedAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String
+  passwordHash   String
+  role           Role      @default(USER)
+  sessionVersion Int       @default(0)
+  active         Boolean   @default(true)
+  deletedAt      DateTime?
+  deactivatedAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  memberships      GroupMember[]
-  assignments      Assignment[]          @relation("AssignmentTargetUser")
-  createdAssigns   Assignment[]          @relation("AssignmentCreatedBy")
-  enrollments      Enrollment[]
-  watchEvents      WatchEvent[]
-  quizAttempts     QuizAttempt[]
-  auditLogs        AuditLog[]
-  activationTokens UserActivationToken[]
+  memberships         GroupMember[]
+  assignments         Assignment[]          @relation("AssignmentTargetUser")
+  createdAssigns      Assignment[]          @relation("AssignmentCreatedBy")
+  enrollments         Enrollment[]
+  watchEvents         WatchEvent[]
+  quizAttempts        QuizAttempt[]
+  auditLogs           AuditLog[]
+  activationTokens    UserActivationToken[]
   passwordResetTokens PasswordResetToken[]
-  notifications    UserNotification[]
+  notifications       UserNotification[]
 
   @@index([active])
   @@index([deletedAt])
@@ -384,19 +403,50 @@ model Checkpoint {
 }
 
 model Video {
-  id          String   @id @default(cuid())
-  courseId    String   @unique
-  storageKey  String
-  fileName    String
-  contentType String   @default("video/mp4")
-  durationSec Int
+  id               String                @id @default(cuid())
+  courseId         String                @unique
+  storageKey       String
+  sourceStorageKey String?
+  fileName         String
+  contentType      String                @default("video/mp4")
+  durationSec      Int
   /// PDF içeriklerinde toplam sayfa; videolarda null.
-  pageCount   Int?
-  sizeBytes   Int      @default(0)
-  createdAt   DateTime @default(now())
+  pageCount        Int?
+  sizeBytes        Int                   @default(0)
+  sourceSizeBytes  Int?
+  processingStatus VideoProcessingStatus @default(READY)
+  processingError  String?
+  mediaVersion     Int                   @default(1)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 
-  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  watchEvents WatchEvent[]
+  course          Course                @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  watchEvents     WatchEvent[]
+  compressionJobs VideoCompressionJob[]
+}
+
+model VideoCompressionJob {
+  id               String                    @id @default(cuid())
+  videoId          String
+  sourceStorageKey String
+  sourceSizeBytes  Int
+  mediaVersion     Int
+  status           VideoCompressionJobStatus @default(QUEUED)
+  attempts         Int                       @default(0)
+  availableAt      DateTime                  @default(now())
+  lockedAt         DateTime?
+  outputStorageKey String?
+  outputSizeBytes  Int?
+  deleteAfter      DateTime?
+  error            String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, mediaVersion])
+  @@index([status, availableAt])
+  @@index([status, deleteAfter])
 }
 
 // ---------------------------------------------------------------------------

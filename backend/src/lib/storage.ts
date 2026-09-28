@@ -1,10 +1,11 @@
 import { createReadStream, createWriteStream } from "fs";
-import { mkdir, readFile, stat, writeFile } from "fs/promises";
+import { mkdir, readFile, stat, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import {
   CreateBucketCommand,
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
@@ -146,6 +147,63 @@ export async function uploadFileObject(
       ContentLength: file.size,
       ContentType: contentType,
     }),
+  );
+}
+
+/** Upload a file from disk without loading the full video into memory. */
+export async function uploadPathObject(
+  key: string,
+  filePath: string,
+  contentType: string,
+) {
+  await ensureStorage();
+
+  if (storageDriver() === "local") {
+    const destination = localPath(key);
+    await mkdir(path.dirname(destination), { recursive: true });
+    await pipeline(createReadStream(filePath), createWriteStream(destination));
+    return;
+  }
+
+  const info = await stat(filePath);
+  await getS3Client().send(
+    new PutObjectCommand({
+      Bucket: bucketName(),
+      Key: key,
+      Body: createReadStream(filePath),
+      ContentLength: info.size,
+      ContentType: contentType,
+    }),
+  );
+}
+
+/** Download an object to disk without buffering the full video in memory. */
+export async function downloadObjectToPath(key: string, filePath: string) {
+  await ensureStorage();
+  await mkdir(path.dirname(filePath), { recursive: true });
+
+  if (storageDriver() === "local") {
+    await pipeline(createReadStream(localPath(key)), createWriteStream(filePath));
+    return;
+  }
+
+  const obj = await getS3Client().send(
+    new GetObjectCommand({ Bucket: bucketName(), Key: key }),
+  );
+  if (!obj.Body) throw new Error("Video indirilemedi");
+  await pipeline(obj.Body as Readable, createWriteStream(filePath));
+}
+
+export async function deleteObject(key: string) {
+  if (storageDriver() === "local") {
+    await unlink(localPath(key)).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+    return;
+  }
+
+  await getS3Client().send(
+    new DeleteObjectCommand({ Bucket: bucketName(), Key: key }),
   );
 }
 

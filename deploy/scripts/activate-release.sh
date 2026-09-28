@@ -29,6 +29,13 @@ docker compose \
   -f "${compose_file}" \
   exec -T backend wget -qO- http://127.0.0.1:3000/api/health
 
+# API sağlıklı olsa bile video worker hemen çökmüşse deployment başarılı sayılmasın.
+docker compose \
+  -p deploy \
+  --env-file "${env_file}" \
+  -f "${compose_file}" \
+  ps --status running --quiet video-worker | grep -q .
+
 curl --fail --silent --show-error --retry 12 --retry-delay 5 \
   "${app_url}/api/health"
 

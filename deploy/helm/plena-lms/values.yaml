@@ -1,0 +1,98 @@
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+backend:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/your-org/plena-lms-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 3000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+frontend:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/your-org/plena-lms-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+
+videoWorker:
+  enabled: true
+  replicaCount: 1
+  tempStorage: 4Gi
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  compression:
+    pollMs: 5000
+    crf: 25
+    preset: medium
+    maxWidth: 1280
+    maxHeight: 720
+    maxRate: 4M
+    bufferSize: 8M
+    audioBitrate: 96k
+    threads: 2
+    deleteGraceHours: 24
+    staleAfterMinutes: 180
+
+config:
+  appUrl: https://lms.example.com
+  corsAllowedOrigins: https://lms.example.com
+  appTimezone: Europe/Istanbul
+  storageDriver: s3
+  awsRegion: eu-central-1
+  s3Bucket: plena-lms-files
+  emailFrom: Plena LMS <noreply@example.com>
+  seedOnStart: "false"
+
+secret:
+  # Recommended: create this Secret outside Helm and keep credentials out of values files.
+  existingSecret: plena-lms-secrets
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  # EKS example:
+  # annotations:
+  #   eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/plena-lms-irsa
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 1g
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  host: lms.example.com
+  tls:
+    enabled: true
+    secretName: plena-lms-tls
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

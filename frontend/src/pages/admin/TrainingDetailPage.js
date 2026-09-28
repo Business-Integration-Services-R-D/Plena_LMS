@@ -15,6 +15,7 @@ const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-whi
 // Sınavın toplam puanı; soru puanlarının toplamı bunu geçemez.
 const MAX_TOTAL_POINTS = 100;
 const PASS_SCORE_OPTIONS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+const formatMb = (bytes) => `${(Number(bytes || 0) / 1024 / 1024).toFixed(1)} MB`;
 
 // Soru puanı 1-100 arası tam sayı; boş/gecersiz giriş 1 sayılır.
 const clampPoints = (value) => {
@@ -86,6 +87,11 @@ export default function TrainingDetailPage() {
   }, [trainingId]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
+    if (!["queued", "processing"].includes(training?.video_processing_status)) return undefined;
+    const timer = window.setInterval(load, 5000);
+    return () => window.clearInterval(timer);
+  }, [load, training?.video_processing_status]);
+  useEffect(() => {
     setSelectedIds(training?.quiz?.question_ids || []);
     setPassEnabled(training?.quiz?.pass_score != null);
     setScoringMode(training?.quiz?.scoring_mode || "auto");
@@ -127,10 +133,16 @@ export default function TrainingDetailPage() {
     if (isPdfFile) fd.append("pageCount", pageCount);
     setUploading(1);
     try {
-      await api.post(`/trainings/${trainingId}/video`, fd, {
+      const result = await api.post(`/trainings/${trainingId}/video`, fd, {
         onUploadProgress: (e) => setUploading(Math.max(1, Math.round((e.loaded / e.total) * 100))),
       });
-      toast.success(isPdfFile ? "PDF yüklendi" : "Video yüklendi");
+      toast.success(
+        isPdfFile
+          ? "PDF yüklendi"
+          : result.data?.processingStatus === "QUEUED"
+            ? "Video kullanıma hazır; arka planda optimize ediliyor"
+            : "Video yüklendi",
+      );
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "İçerik yüklenemedi");
@@ -427,6 +439,30 @@ export default function TrainingDetailPage() {
         {/* ANA EĞİTİM İÇERİĞİ */}
         <div className="n-card p-8">
           <h2 className="text-lg font-medium tracking-tight text-navy-950 mb-6">Eğitim İçeriği</h2>
+          {!isPdf && training.video_processing_status && (
+            <div className={`mb-4 rounded-xl border px-4 py-3 text-sm ${
+              ["queued", "processing"].includes(training.video_processing_status)
+                ? "border-amber-200 bg-amber-50 text-amber-900"
+                : training.video_processing_status === "optimized"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  : training.video_processing_status === "failed"
+                    ? "border-red-200 bg-red-50 text-red-900"
+                    : "border-slate-200 bg-slate-50 text-slate-700"
+            }`} data-testid="video-processing-status">
+              {training.video_processing_status === "queued" && "Video kullanıma hazır. Sıkıştırma kuyruğunda bekliyor."}
+              {training.video_processing_status === "processing" && "Video kullanıma hazır. Arka planda sıkıştırılıyor."}
+              {training.video_processing_status === "optimized" && (
+                <span>
+                  Video optimize edildi: {formatMb(training.video_source_size)} → {formatMb(training.video_size)}
+                </span>
+              )}
+              {training.video_processing_status === "skipped" && "Orijinal video zaten yeterince küçüktü; orijinal korunuyor."}
+              {training.video_processing_status === "failed" && (
+                <span>Optimizasyon tamamlanamadı; orijinal video kullanılmaya devam ediyor.{training.video_processing_error ? ` (${training.video_processing_error})` : ""}</span>
+              )}
+              {training.video_processing_status === "ready" && "Orijinal video kullanılıyor."}
+            </div>
+          )}
           {training.video_filename ? (
             <div>
               {isPdf ? (

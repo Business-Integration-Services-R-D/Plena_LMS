@@ -1,5 +1,10 @@
 #!/bin/sh
 set -e
+
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
+
 echo "Waiting for database and applying migrations..."
 npx prisma migrate deploy
 if [ "$SEED_ON_START" = "true" ]; then

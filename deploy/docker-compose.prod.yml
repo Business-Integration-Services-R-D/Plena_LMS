@@ -26,6 +26,36 @@ services:
     networks:
       - plena
 
+  video-worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["npm", "run", "worker:video"]
+    cpus: ${VIDEO_WORKER_CPUS:-1.0}
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      STORAGE_DRIVER: s3
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+      VIDEO_WORKER_POLL_MS: ${VIDEO_WORKER_POLL_MS:-5000}
+      VIDEO_COMPRESSION_CRF: ${VIDEO_COMPRESSION_CRF:-25}
+      VIDEO_COMPRESSION_PRESET: ${VIDEO_COMPRESSION_PRESET:-medium}
+      VIDEO_COMPRESSION_MAX_WIDTH: ${VIDEO_COMPRESSION_MAX_WIDTH:-1280}
+      VIDEO_COMPRESSION_MAX_HEIGHT: ${VIDEO_COMPRESSION_MAX_HEIGHT:-720}
+      VIDEO_COMPRESSION_MAX_RATE: ${VIDEO_COMPRESSION_MAX_RATE:-4M}
+      VIDEO_COMPRESSION_BUFFER_SIZE: ${VIDEO_COMPRESSION_BUFFER_SIZE:-8M}
+      VIDEO_COMPRESSION_AUDIO_BITRATE: ${VIDEO_COMPRESSION_AUDIO_BITRATE:-96k}
+      VIDEO_COMPRESSION_THREADS: ${VIDEO_COMPRESSION_THREADS:-1}
+      VIDEO_COMPRESSION_DELETE_GRACE_HOURS: ${VIDEO_COMPRESSION_DELETE_GRACE_HOURS:-24}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - plena
+
   frontend:
     build:
       context: ../frontend

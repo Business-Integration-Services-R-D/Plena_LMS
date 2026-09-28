@@ -1,7 +1,8 @@
 # AWS production deployment
 
-This deployment runs the frontend, API and Caddy on EC2. PostgreSQL is hosted
-on private RDS and course files are stored in a private S3 bucket.
+This deployment runs the frontend, API, background FFmpeg video worker and
+Caddy on EC2. PostgreSQL is hosted on private RDS and course files are stored
+in a private S3 bucket.
 
 ## Required AWS resources
 
@@ -40,8 +41,14 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d --bui
 
 ```bash
 docker compose --env-file .env.production -f docker-compose.prod.yml ps
+docker compose --env-file .env.production -f docker-compose.prod.yml logs video-worker --tail=100
 curl -fsS "https://${APP_DOMAIN}/api/health"
 ```
+
+New MP4 uploads are playable immediately from the original S3 object. The
+worker creates an H.264 720p copy in the background, verifies duration and
+size, then atomically activates it. The original remains available for 24
+hours before cleanup; a failed job never replaces the playable original.
 
 ## GitHub Actions production pipeline
 
