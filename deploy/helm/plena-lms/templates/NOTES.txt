@@ -1,0 +1,8 @@
+1. Open the application:
+   https://{{ .Values.ingress.host }}
+
+2. Check workloads:
+   kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+3. Follow video compression jobs:
+   kubectl logs deployment/{{ include "plena-lms.fullname" . }}-video-worker -f

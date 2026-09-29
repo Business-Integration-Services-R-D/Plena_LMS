@@ -1,0 +1,27 @@
+backend:
+  image:
+    repository: REGISTRY/plena-lms-backend
+    tag: RELEASE_TAG
+
+frontend:
+  image:
+    repository: REGISTRY/plena-lms-frontend
+    tag: RELEASE_TAG
+
+config:
+  appUrl: https://lms.bislabs.tech
+  corsAllowedOrigins: https://lms.bislabs.tech
+  awsRegion: eu-central-1
+  s3Bucket: REPLACE_WITH_BUCKET
+  emailFrom: Plena LMS <noreply@bislabs.tech>
+
+ingress:
+  host: lms.bislabs.tech
+  tls:
+    enabled: true
+    secretName: plena-lms-tls
+
+# EKS kullanılıyorsa S3 yetkisini bu service account'a IRSA ile bağlayın.
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::AWS_ACCOUNT_ID:role/PLENA_LMS_IRSA_ROLE
