@@ -37,14 +37,16 @@ frontend:
 videoWorker:
   enabled: true
   replicaCount: 1
-  tempStorage: 4Gi
+  tempStorage: 8Gi
   resources:
     requests:
       cpu: "1"
       memory: 1Gi
+      ephemeral-storage: 4Gi
     limits:
       cpu: "2"
       memory: 2Gi
+      ephemeral-storage: 8Gi
   compression:
     pollMs: 5000
     crf: 25
@@ -67,6 +69,13 @@ config:
   s3Bucket: plena-lms-files
   emailFrom: Plena LMS <noreply@example.com>
   seedOnStart: "false"
+
+# Eclit gibi ortamlarda backend ve worker'ın birlikte kullandığı RWX SMB PVC.
+# S3/object storage kullanılıyorsa disabled bırakın.
+persistence:
+  enabled: false
+  existingClaim: ""
+  mountPath: /app/storage/videos
 
 secret:
   # Recommended: create this Secret outside Helm and keep credentials out of values files.

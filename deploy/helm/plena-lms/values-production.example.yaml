@@ -11,17 +11,24 @@ frontend:
 config:
   appUrl: https://lms.bislabs.tech
   corsAllowedOrigins: https://lms.bislabs.tech
-  awsRegion: eu-central-1
-  s3Bucket: REPLACE_WITH_BUCKET
+  storageDriver: local
+  s3Bucket: ""
   emailFrom: Plena LMS <noreply@bislabs.tech>
 
+# Backend ve video worker aynı RWX SMB volume'u kullanmalıdır.
+persistence:
+  enabled: true
+  existingClaim: REPLACE_WITH_RWX_SMB_PVC
+  mountPath: /app/storage/videos
+
 ingress:
+  annotations:
+    # Video 16 MiB parçalarla, PDF ise tek istekte (max 50 MB) yüklenir.
+    nginx.ingress.kubernetes.io/proxy-body-size: 64m
   host: lms.bislabs.tech
   tls:
     enabled: true
     secretName: plena-lms-tls
 
-# EKS kullanılıyorsa S3 yetkisini bu service account'a IRSA ile bağlayın.
 serviceAccount:
-  annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::AWS_ACCOUNT_ID:role/PLENA_LMS_IRSA_ROLE
+  annotations: {}

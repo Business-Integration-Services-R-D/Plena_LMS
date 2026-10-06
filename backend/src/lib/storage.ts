@@ -25,11 +25,27 @@ export function storageDriver(): "local" | "s3" {
 }
 
 function localRoot() {
-  return path.join(process.cwd(), "storage", "videos");
+  return process.env.LOCAL_STORAGE_ROOT || path.join(process.cwd(), "storage", "videos");
 }
 
 function localPath(key: string) {
   return path.join(localRoot(), ...key.split("/"));
+}
+
+/**
+ * Return the on-disk path when shared local/PV storage is active.
+ * Workers can read large sources directly instead of copying them to /tmp.
+ */
+export function localObjectPath(key: string): string | null {
+  return storageDriver() === "local" ? localPath(key) : null;
+}
+
+/** Internal path for resumable upload staging data on shared local storage. */
+export function localUploadPath(...parts: string[]): string {
+  if (storageDriver() !== "local") {
+    throw new Error("Parçalı yükleme yalnızca local/PV depolamada kullanılabilir");
+  }
+  return localPath(path.join(".uploads", ...parts));
 }
 
 function getS3Client() {

@@ -2,6 +2,7 @@ import "@/App.css";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { VideoUploadProvider } from "@/context/VideoUploadContext";
 import AuthCallback from "@/pages/AuthCallback";
 import ActivatePage from "@/pages/ActivatePage";
 import LoginPage from "@/pages/LoginPage";
@@ -80,8 +81,10 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <AppRouter />
-        <Toaster position="top-right" richColors />
+        <VideoUploadProvider>
+          <AppRouter />
+          <Toaster position="top-right" richColors />
+        </VideoUploadProvider>
       </BrowserRouter>
     </AuthProvider>
   );
