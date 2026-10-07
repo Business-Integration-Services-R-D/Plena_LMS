@@ -30,7 +30,7 @@ export type VideoUploadManifest = {
   courseId: string;
   ownerId: string;
   fileName: string;
-  contentType: "video/mp4";
+  contentType: "video/mp4" | "video/webm";
   durationSec: number;
   totalBytes: number;
   chunkSize: number;
@@ -150,8 +150,10 @@ export async function createVideoUpload(input: {
       "CHUNKED_UPLOAD_UNAVAILABLE",
     );
   }
-  if (!input.fileName.toLowerCase().endsWith(".mp4")) {
-    throw new VideoUploadError("Yalnızca MP4 video yükleyebilirsiniz");
+  const lowerName = input.fileName.toLowerCase();
+  const contentType = lowerName.endsWith(".webm") ? "video/webm" : "video/mp4";
+  if (!lowerName.endsWith(".mp4") && !lowerName.endsWith(".webm")) {
+    throw new VideoUploadError("Yalnızca MP4 veya WebM video yükleyebilirsiniz");
   }
   if (!Number.isInteger(input.totalBytes) || input.totalBytes < 1) {
     throw new VideoUploadError("Video boyutu geçersiz");
@@ -173,7 +175,7 @@ export async function createVideoUpload(input: {
     courseId: input.courseId,
     ownerId: input.ownerId,
     fileName: input.fileName,
-    contentType: "video/mp4",
+    contentType,
     durationSec: input.durationSec,
     totalBytes: input.totalBytes,
     chunkSize: VIDEO_UPLOAD_CHUNK_BYTES,

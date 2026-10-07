@@ -59,7 +59,7 @@ export async function POST(
         courseId,
         storageKey: manifest.storageKey,
         fileName: manifest.fileName,
-        contentType: "video/mp4",
+        contentType: manifest.contentType,
         durationSec: manifest.durationSec,
         pageCount: null,
         sizeBytes: manifest.totalBytes,

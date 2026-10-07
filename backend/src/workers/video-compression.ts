@@ -193,7 +193,10 @@ async function processJob(job: VideoCompressionJob) {
 
   const workDir = await mkdtemp(path.join(tmpdir(), "plena-video-"));
   const localSourcePath = localObjectPath(job.sourceStorageKey);
-  const inputPath = localSourcePath || path.join(workDir, "source.mp4");
+  const sourceExtension = path.extname(job.sourceStorageKey).toLowerCase() === ".webm"
+    ? ".webm"
+    : ".mp4";
+  const inputPath = localSourcePath || path.join(workDir, `source${sourceExtension}`);
   const outputPath = path.join(workDir, "optimized.mp4");
   const outputKey = `courses/${current.courseId}/optimized/${current.id}-v${job.mediaVersion}.mp4`;
 
@@ -254,6 +257,7 @@ async function processJob(job: VideoCompressionJob) {
         },
         data: {
           storageKey: outputKey,
+          contentType: "video/mp4",
           sizeBytes: outputInfo.size,
           processingStatus: VideoProcessingStatus.OPTIMIZED,
           processingError: null,

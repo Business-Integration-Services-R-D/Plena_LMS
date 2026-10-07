@@ -10,7 +10,7 @@ Tek repo, iki katman:
 
 ## Güncel özellikler
 
-- Arka planda parçalı yüklenen MP4 (en fazla 2 GB) ve PDF (en fazla 50 MB) eğitim içerikleri
+- Arka planda parçalı yüklenen MP4/WebM (en fazla 2 GB) ve PDF (en fazla 50 MB) eğitim içerikleri
 - Video ileri sarma engeli ve PDF'de sıralı sayfa ilerlemesi
 - Kontrol noktaları, sınavlar ve serbest metin cevapları
 - Kullanıcı aktivasyonu, aktif/pasif hesap yönetimi ve grup atamaları

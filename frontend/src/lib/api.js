@@ -1577,7 +1577,7 @@ export const api = {
   delete: (url, config) => dispatch("DELETE", url, undefined, config),
 };
 
-// Ana eğitim içeriği (MP4/PDF): kurs bazlı kimlik doğrulamalı stream endpoint'i.
+// Ana eğitim içeriği (MP4/WebM/PDF): kurs bazlı kimlik doğrulamalı stream endpoint'i.
 export const videoUrl = (trainingId) =>
   `${BACKEND_URL}/api/user/courses/${trainingId}/video`;
 export const contentUrl = videoUrl;

@@ -65,6 +65,20 @@ describe("chunked video upload", () => {
     ).rejects.toMatchObject({ status: 413 });
   });
 
+  it("preserves WebM content type until the worker creates an MP4", async () => {
+    await useLocalStorage();
+    const manifest = await createVideoUpload({
+      courseId: "course-1",
+      ownerId: "admin-1",
+      fileName: "egitim.webm",
+      totalBytes: 10,
+      durationSec: 42,
+    });
+
+    expect(manifest.contentType).toBe("video/webm");
+    expect(manifest.storageKey).toMatch(/\.webm$/);
+  });
+
   it("stops a chunk stream that exceeds its declared session size", async () => {
     await useLocalStorage();
     const manifest = await createVideoUpload({

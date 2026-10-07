@@ -23,7 +23,7 @@ function countPdfPages(bytes: Uint8Array): number {
 }
 
 /**
- * Kursa MP4 video veya PDF doküman yükleme/değiştirme.
+ * Kursa MP4/WebM video veya PDF doküman yükleme/değiştirme.
  * İç model geriye uyumluluk için Video adını korur; kursun tek ana içeriğidir.
  */
 export async function POST(
@@ -54,9 +54,10 @@ export async function POST(
   const lowerName = originalName.toLowerCase();
   const isPdf = file.type === "application/pdf" || lowerName.endsWith(".pdf");
   const isMp4 = file.type === "video/mp4" || lowerName.endsWith(".mp4");
-  if (!isPdf && !isMp4) {
+  const isWebm = file.type === "video/webm" || lowerName.endsWith(".webm");
+  if (!isPdf && !isMp4 && !isWebm) {
     return NextResponse.json(
-      { error: "Yalnızca MP4 video veya PDF dosyası yüklenebilir" },
+      { error: "Yalnızca MP4/WebM video veya PDF dosyası yüklenebilir" },
       { status: 400 },
     );
   }
@@ -77,7 +78,11 @@ export async function POST(
 
   const safeName = sanitizeStorageKeyPart(originalName);
   const storageKey = `courses/${Date.now()}-${safeName}`;
-  const contentType = isPdf ? "application/pdf" : "video/mp4";
+  const contentType = isPdf
+    ? "application/pdf"
+    : isWebm
+      ? "video/webm"
+      : "video/mp4";
 
   if (isPdf) {
     const bytes = new Uint8Array(await file.arrayBuffer());

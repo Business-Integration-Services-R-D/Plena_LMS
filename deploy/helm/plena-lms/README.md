@@ -14,7 +14,7 @@ PostgreSQL chart dışında yönetilir. Medya depolama için iki seçenek vardı
 - Object storage: `STORAGE_DRIVER=s3` kullanılır ve backend ile worker aynı
   bucket'a erişir.
 
-Local/PV modunda MP4 videolar 16 MiB parçalarla, en fazla 2 GB olarak yüklenir.
+Local/PV modunda MP4/WebM videolar 16 MiB parçalarla, en fazla 2 GB olarak yüklenir.
 Yükleme uygulama içinde sayfalar arasında gezinirken devam eder. Video worker
 kaynak dosyayı doğrudan ortak volume'dan okuyarak gereksiz `/tmp` kopyasını
 oluşturmaz.
@@ -118,7 +118,7 @@ helm upgrade --install plena-lms dist/plena-lms-0.1.0.tgz \
   -f values-production.yaml
 ```
 
-Backend başlangıçta `prisma migrate deploy` çalıştırır. Yeni MP4 yüklenir yüklenmez
+Backend başlangıçta `prisma migrate deploy` çalıştırır. Yeni MP4/WebM yüklenir yüklenmez
 orijinal dosya aktif olur; worker H.264 720p çıktıyı hazırlayıp en az %5 küçülme
 sağlarsa DB işaretçisini atomik değiştirir. Orijinal dosya varsayılan olarak 24
 saat sonra silinir. İş başarısız olursa orijinal video aktif kalır.

@@ -16,7 +16,7 @@ export async function publishCourseContent(input: {
   courseId: string;
   storageKey: string;
   fileName: string;
-  contentType: "video/mp4" | "application/pdf";
+  contentType: "video/mp4" | "video/webm" | "application/pdf";
   durationSec: number;
   pageCount: number | null;
   sizeBytes: number;

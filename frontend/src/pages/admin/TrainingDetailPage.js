@@ -117,8 +117,13 @@ export default function TrainingDetailPage() {
       return;
     }
     const isPdfFile = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
-    const isVideoFile = file.name.toLowerCase().endsWith(".mp4") || file.type === "video/mp4";
-    if (!isPdfFile && !isVideoFile) return toast.error("Yalnızca MP4 video veya PDF yükleyebilirsiniz");
+    const lowerFileName = file.name.toLowerCase();
+    const isVideoFile =
+      lowerFileName.endsWith(".mp4") ||
+      lowerFileName.endsWith(".webm") ||
+      file.type === "video/mp4" ||
+      file.type === "video/webm";
+    if (!isPdfFile && !isVideoFile) return toast.error("Yalnızca MP4/WebM video veya PDF yükleyebilirsiniz");
     if (isPdfFile && file.size > 50 * 1024 * 1024) return toast.error("PDF 50MB sınırını aşıyor");
     if (isVideoFile && file.size > 2_000_000_000) return toast.error("Video 2GB sınırını aşıyor");
 
@@ -757,7 +762,7 @@ export default function TrainingDetailPage() {
               <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
                 <UploadCloud className="w-6 h-6 text-slate-400" />
               </div>
-              <p className="text-sm font-medium text-slate-700">MP4 video veya PDF yükleyin</p>
+              <p className="text-sm font-medium text-slate-700">MP4/WebM video veya PDF yükleyin</p>
               <p className="text-xs text-slate-400">Video 2GB · PDF 50MB</p>
             </button>
           )}
@@ -771,7 +776,7 @@ export default function TrainingDetailPage() {
               </p>
             </div>
           )}
-          <input ref={fileRef} type="file" accept="video/mp4,application/pdf,.mp4,.pdf" className="hidden" data-testid="video-file-input" onChange={(e) => uploadContent(e.target.files?.[0])} />
+          <input ref={fileRef} type="file" accept="video/mp4,video/webm,application/pdf,.mp4,.webm,.pdf" className="hidden" data-testid="video-file-input" onChange={(e) => uploadContent(e.target.files?.[0])} />
         </div>
 
         {/* CHECKPOINTS */}
