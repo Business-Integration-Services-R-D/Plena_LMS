@@ -39,6 +39,7 @@ export const toUiUser = (u) =>
               ? "invited"
               : "pending_activation",
         created_at: u.createdAt || null,
+        deleted_at: u.deletedAt || null,
       }
     : null;
 
@@ -708,8 +709,11 @@ const routes = [
   {
     method: "GET",
     pattern: /^\/users$/,
-    handler: async () => {
-      const res = await http.get("/admin/users");
+    handler: async (_m, _body, query) => {
+      const archived = query.get("archived") === "true";
+      const res = await http.get(
+        archived ? "/admin/users?archived=true" : "/admin/users",
+      );
       return res.data.map(toUiUser);
     },
   },
@@ -753,6 +757,20 @@ const routes = [
     handler: async (m) => {
       const res = await http.post(`/admin/users/${m[1]}/resend-activation`);
       return res.data;
+    },
+  },
+  {
+    method: "POST",
+    pattern: /^\/users\/([^/]+)\/restore$/,
+    handler: async (m, body) => {
+      const res = await http.post(`/admin/users/${m[1]}/restore`, {
+        sendActivation: body?.sendActivation !== false,
+      });
+      return {
+        ...toUiUser(res.data),
+        activation_email_sent: res.data.activationEmailSent,
+        activation_email_error: res.data.activationEmailError,
+      };
     },
   },
 

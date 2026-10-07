@@ -15,7 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Mail, Trash2, Users as UsersIcon, Pencil } from "lucide-react";
+import { Plus, Mail, Trash2, Users as UsersIcon, Pencil, RotateCcw } from "lucide-react";
 
 const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
 const btnPrimary = "px-5 py-2.5 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow] disabled:opacity-40";
@@ -42,6 +42,7 @@ export default function UsersPage() {
   const { user: currentUser } = useAuth();
   const [tab, setTab] = useState("users");
   const [users, setUsers] = useState([]);
+  const [archivedUsers, setArchivedUsers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [userModal, setUserModal] = useState(false);
   const [groupModal, setGroupModal] = useState(null); // null | {group or new}
@@ -50,9 +51,12 @@ export default function UsersPage() {
   const [groupForm, setGroupForm] = useState({ name: "", member_ids: [] });
   const [statusUpdating, setStatusUpdating] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
+  const [restoreSubmitting, setRestoreSubmitting] = useState(false);
 
   const load = useCallback(() => {
     api.get("/users").then((r) => setUsers(r.data));
+    api.get("/users?archived=true").then((r) => setArchivedUsers(r.data));
     api.get("/groups").then((r) => setGroups(r.data));
   }, []);
   useEffect(load, [load]);
@@ -70,7 +74,13 @@ export default function UsersPage() {
       setForm({ email: "", name: "", role: "employee" });
       load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || "Kullanıcı oluşturulamadı");
+      if (e.response?.data?.code === "USER_ARCHIVED") {
+        setUserModal(false);
+        setTab("archived");
+        toast.warning("Bu e-posta arşivlenmiş bir kullanıcıya ait. Kullanıcıyı geri yükleyebilirsiniz.");
+      } else {
+        toast.error(e.response?.data?.detail || "Kullanıcı oluşturulamadı");
+      }
     } finally {
       setUserSubmitting(false);
     }
@@ -93,11 +103,36 @@ export default function UsersPage() {
     if (!deleteTarget) return;
     try {
       await api.delete(`/users/${deleteTarget.user_id}`);
-      toast.success("Kullanıcı silindi; geçmiş kayıtları korundu");
+      toast.success("Kullanıcı arşivlendi; geçmiş kayıtları korundu");
       setDeleteTarget(null);
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "Silinemedi");
+    }
+  };
+
+  const restoreUser = async () => {
+    if (!restoreTarget) return;
+    setRestoreSubmitting(true);
+    try {
+      const response = await api.post(`/users/${restoreTarget.user_id}/restore`, {
+        sendActivation: true,
+      });
+      if (response.data.activation_email_sent === false) {
+        toast.warning(
+          response.data.activation_email_error ||
+            "Kullanıcı geri yüklendi ancak aktivasyon maili gönderilemedi",
+        );
+      } else {
+        toast.success("Kullanıcı geri yüklendi ve aktivasyon maili gönderildi");
+      }
+      setRestoreTarget(null);
+      setTab("users");
+      load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || "Kullanıcı geri yüklenemedi");
+    } finally {
+      setRestoreSubmitting(false);
     }
   };
 
@@ -156,15 +191,15 @@ export default function UsersPage() {
             <button data-testid="add-user-btn" className={btnPrimary} onClick={() => setUserModal(true)}>
               <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> Kullanıcı Ekle</span>
             </button>
-          ) : (
+          ) : tab === "groups" ? (
             <button data-testid="add-group-btn" className={btnPrimary} onClick={() => { setGroupForm({ name: "", member_ids: [] }); setGroupModal({}); }}>
               <span className="flex items-center gap-2"><Plus className="w-4 h-4" /> Grup Oluştur</span>
             </button>
-          )
+          ) : null
         }
       />
       <div className="flex gap-1 bg-slate-100 rounded-full p-1 w-fit mb-8">
-        {[["users", "Kullanıcılar"], ["groups", "Gruplar"]].map(([k, l]) => (
+        {[["users", "Kullanıcılar"], ["archived", "Arşivlenenler"], ["groups", "Gruplar"]].map(([k, l]) => (
           <button
             key={k}
             data-testid={`tab-${k}`}
@@ -230,7 +265,7 @@ export default function UsersPage() {
                         </button>
                       )}
                       {currentUser?.user_id !== u.user_id && (
-                        <button data-testid={`delete-user-${u.email}`} onClick={() => setDeleteTarget(u)} title="Sil"
+                        <button data-testid={`delete-user-${u.email}`} onClick={() => setDeleteTarget(u)} title="Arşivle"
                           className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -241,6 +276,52 @@ export default function UsersPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {tab === "archived" && (
+        <div className="n-card n-card-brand overflow-x-auto">
+          {archivedUsers.length === 0 ? (
+            <p className="px-6 py-8 text-sm text-slate-400">Arşivlenmiş kullanıcı bulunmuyor.</p>
+          ) : (
+            <table className="w-full text-sm min-w-[640px]">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wider text-slate-400 border-b n-hairline bg-[#F5F8FA]">
+                  <th className="px-6 py-4 font-medium">Kullanıcı</th>
+                  <th className="px-6 py-4 font-medium">Rol</th>
+                  <th className="px-6 py-4 font-medium">Arşivlenme</th>
+                  <th className="px-6 py-4 font-medium text-right">İşlemler</th>
+                </tr>
+              </thead>
+              <tbody>
+                {archivedUsers.map((u) => (
+                  <tr key={u.user_id} className="border-b border-navy-900/5 last:border-0 hover:bg-slate-50/60" data-testid={`archived-user-row-${u.email}`}>
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-navy-950">{u.name}</p>
+                      <p className="text-slate-400 text-xs">{u.email}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${u.role === "admin" ? "bg-gradient-to-r from-navy-900 to-navy-700 text-white" : "bg-slate-100 text-slate-600"}`}>
+                        {u.role === "admin" ? "Yönetici" : "Çalışan"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-slate-400">{fmtDate(u.deleted_at)}</td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        data-testid={`restore-user-${u.email}`}
+                        onClick={() => setRestoreTarget(u)}
+                        title="Geri yükle"
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-brand-700 hover:bg-brand-50 transition-colors"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        <span className="text-xs font-medium">Geri Yükle</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
 
@@ -309,7 +390,7 @@ export default function UsersPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Kullanıcı silinsin mi?</AlertDialogTitle>
+            <AlertDialogTitle>Kullanıcı arşivlensin mi?</AlertDialogTitle>
             <AlertDialogDescription>
               <strong>{deleteTarget?.name}</strong> kullanıcı listesinden kaldırılacak ve
               artık giriş yapamayacak. Eğitim ilerlemesi, sınav sonuçları, izleme
@@ -323,7 +404,34 @@ export default function UsersPage() {
               onClick={deleteUser}
               className="bg-red-600 text-white hover:bg-red-700"
             >
-              Kullanıcıyı Sil
+              Kullanıcıyı Arşivle
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={Boolean(restoreTarget)}
+        onOpenChange={(open) => !open && !restoreSubmitting && setRestoreTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kullanıcı geri yüklensin mi?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{restoreTarget?.name}</strong> mevcut geçmişi korunarak kullanıcı
+              listesine geri alınacak. Eski parola ve oturumlar geçersiz kalacak, yeni
+              bir aktivasyon maili gönderilecek.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoreSubmitting}>Vazgeç</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="confirm-restore-user"
+              onClick={restoreUser}
+              disabled={restoreSubmitting}
+              className="bg-navy-900 text-white hover:bg-navy-800"
+            >
+              {restoreSubmitting ? "Geri yükleniyor..." : "Geri Yükle ve Aktivasyon Gönder"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

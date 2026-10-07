@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
-import { AuditAction, Role } from "@prisma/client";
+import { AuditAction, Prisma, Role } from "@prisma/client";
 import { z } from "zod";
 import {
   discardActivationToken,
@@ -12,13 +12,14 @@ import { recordAudit } from "@/lib/audit";
 import { sendActivationEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await requireSession([Role.ADMIN]);
   if (!session) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  const archived = req.nextUrl.searchParams.get("archived") === "true";
   const users = await prisma.user.findMany({
-    where: { deletedAt: null },
-    orderBy: { createdAt: "asc" },
+    where: archived ? { deletedAt: { not: null } } : { deletedAt: null },
+    orderBy: archived ? { deletedAt: "desc" } : { createdAt: "asc" },
     select: {
       id: true,
       email: true,
@@ -26,8 +27,10 @@ export async function GET() {
       role: true,
       active: true,
       deactivatedAt: true,
+      deletedAt: true,
       createdAt: true,
       activationTokens: {
+        where: { usedAt: null },
         select: { id: true },
         take: 1,
       },
@@ -59,13 +62,33 @@ export async function POST(req: NextRequest) {
   }
 
   const hasInitialPassword = Boolean(parsed.data.password);
+  const email = parsed.data.email.toLowerCase();
+
+  const existing = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, deletedAt: true },
+  });
+  if (existing) {
+    return NextResponse.json(
+      existing.deletedAt
+        ? {
+            error:
+              "Bu e-posta arşivlenmiş bir kullanıcıya ait. Kullanıcıyı Arşivlenenler sekmesinden geri yükleyin.",
+            code: "USER_ARCHIVED",
+            userId: existing.id,
+          }
+        : { error: "E-posta zaten kayıtlı", code: "EMAIL_ALREADY_EXISTS" },
+      { status: 409 },
+    );
+  }
+
   const passwordHash = await hashPassword(
     parsed.data.password || randomBytes(32).toString("base64url"),
   );
   try {
     const user = await prisma.user.create({
       data: {
-        email: parsed.data.email.toLowerCase(),
+        email,
         name: parsed.data.name,
         passwordHash,
         role: parsed.data.role,
@@ -145,7 +168,16 @@ export async function POST(req: NextRequest) {
       },
       { status: 201 },
     );
-  } catch {
-    return NextResponse.json({ error: "E-posta zaten kayıtlı" }, { status: 409 });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        { error: "E-posta zaten kayıtlı", code: "EMAIL_ALREADY_EXISTS" },
+        { status: 409 },
+      );
+    }
+    throw error;
   }
 }
