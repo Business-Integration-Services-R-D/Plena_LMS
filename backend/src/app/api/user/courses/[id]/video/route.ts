@@ -9,7 +9,7 @@ import { parseRangeHeader } from "@/lib/range";
 export const dynamic = "force-dynamic";
 
 /**
- * Ana eğitim içeriğini (MP4/PDF) kimlik doğrulamalı olarak servis eder.
+ * Ana eğitim içeriğini (MP4/WebM/PDF) kimlik doğrulamalı olarak servis eder.
  *
  * Range destekli: oynatıcı kaldığı yerden devam ederken tüm dosyayı indirmek
  * zorunda kalmaz. Bu bir ileri sarma açığı yaratmaz; izleme ilerlemesi

@@ -10,7 +10,7 @@ Tek repo, iki katman:
 
 ## Güncel özellikler
 
-- MP4 (en fazla 1 GB) ve PDF (en fazla 50 MB) eğitim içerikleri
+- Arka planda parçalı yüklenen MP4/WebM (en fazla 2 GB) ve PDF (en fazla 50 MB) eğitim içerikleri
 - Video ileri sarma engeli ve PDF'de sıralı sayfa ilerlemesi
 - Kontrol noktaları, sınavlar ve serbest metin cevapları
 - Kullanıcı aktivasyonu, aktif/pasif hesap yönetimi ve grup atamaları
@@ -60,5 +60,5 @@ npm run db:setup   # prisma db push + demo verisi
 
 - Ortam dosyaları gitignore'dadır; şablonları repodadır: `frontend/.env.example` ve `backend/.env.example`. `./setup.sh` bunlardan gerçek `.env` dosyalarını üretir.
 - Lokal modda yüklenen eğitim içerikleri `backend/storage/videos/` altında, veritabanı verisi `.tools/pg/data/` altında tutulur; ikisi de gitignore'dadır.
-- Production adresi `https://lms.bislabs.tech`; dosyalar private S3 bucket'ta, veritabanı private RDS üzerinde tutulur.
+- Kubernetes production kurulumunda videolar backend ve worker'ın birlikte kullandığı RWX SMB Persistent Volume üzerinde tutulabilir.
 - `backend/docker-compose.yml` Postgres + MinIO + Caddy ile konteynerli kurulum içindir (lokal geliştirmede kullanılmaz).

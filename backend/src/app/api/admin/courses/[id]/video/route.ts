@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  AuditAction,
-  EnrollmentStatus,
-  Role,
-  VideoCompressionJobStatus,
-  VideoProcessingStatus,
-} from "@prisma/client";
+import { Role } from "@prisma/client";
 import { requireSession } from "@/lib/auth";
-import { recordAudit } from "@/lib/audit";
+import { publishCourseContent } from "@/lib/course-content-upload";
 import { prisma } from "@/lib/prisma";
 import {
   sanitizeStorageKeyPart,
@@ -29,7 +23,7 @@ function countPdfPages(bytes: Uint8Array): number {
 }
 
 /**
- * Kursa MP4 video veya PDF doküman yükleme/değiştirme.
+ * Kursa MP4/WebM video veya PDF doküman yükleme/değiştirme.
  * İç model geriye uyumluluk için Video adını korur; kursun tek ana içeriğidir.
  */
 export async function POST(
@@ -60,9 +54,10 @@ export async function POST(
   const lowerName = originalName.toLowerCase();
   const isPdf = file.type === "application/pdf" || lowerName.endsWith(".pdf");
   const isMp4 = file.type === "video/mp4" || lowerName.endsWith(".mp4");
-  if (!isPdf && !isMp4) {
+  const isWebm = file.type === "video/webm" || lowerName.endsWith(".webm");
+  if (!isPdf && !isMp4 && !isWebm) {
     return NextResponse.json(
-      { error: "Yalnızca MP4 video veya PDF dosyası yüklenebilir" },
+      { error: "Yalnızca MP4/WebM video veya PDF dosyası yüklenebilir" },
       { status: 400 },
     );
   }
@@ -83,7 +78,11 @@ export async function POST(
 
   const safeName = sanitizeStorageKeyPart(originalName);
   const storageKey = `courses/${Date.now()}-${safeName}`;
-  const contentType = isPdf ? "application/pdf" : "video/mp4";
+  const contentType = isPdf
+    ? "application/pdf"
+    : isWebm
+      ? "video/webm"
+      : "video/mp4";
 
   if (isPdf) {
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -103,95 +102,15 @@ export async function POST(
     await uploadFileObject(storageKey, file, contentType);
   }
 
-  const previousWasPdf = Boolean(course.video?.pageCount);
-  const contentKindChanged = Boolean(course.video) && previousWasPdf !== isPdf;
-  const contentReplaced = Boolean(course.video);
-  const video = await prisma.$transaction(async (tx) => {
-    const current = await tx.video.findUnique({ where: { courseId } });
-    const mediaVersion = (current?.mediaVersion ?? 0) + 1;
-    const videoData = {
-      storageKey,
-      sourceStorageKey: isPdf ? null : storageKey,
-      fileName: originalName,
-      contentType,
-      durationSec: isPdf ? requestedPageCount : durationSec,
-      pageCount: isPdf ? requestedPageCount : null,
-      sizeBytes: file.size,
-      sourceSizeBytes: isPdf ? null : file.size,
-      processingStatus: isPdf
-        ? VideoProcessingStatus.READY
-        : VideoProcessingStatus.QUEUED,
-      processingError: null,
-      mediaVersion,
-    };
-    const saved = current
-      ? await tx.video.update({ where: { id: current.id }, data: videoData })
-      : await tx.video.create({ data: { courseId, ...videoData } });
-
-    // Henüz başlamamış eski işler yeni dosyanın üzerine yazmamalı.
-    await tx.videoCompressionJob.updateMany({
-      where: {
-        videoId: saved.id,
-        status: VideoCompressionJobStatus.QUEUED,
-      },
-      data: {
-        status: VideoCompressionJobStatus.STALE,
-        error: "Yeni bir eğitim içeriği yüklendi",
-      },
-    });
-
-    if (!isPdf) {
-      await tx.videoCompressionJob.create({
-        data: {
-          videoId: saved.id,
-          sourceStorageKey: storageKey,
-          sourceSizeBytes: file.size,
-          mediaVersion,
-        },
-      });
-    }
-
-    if (contentReplaced) {
-      // Kontrol noktaları ve ilerleme eski dosyanın konumlarına bağlıdır.
-      await tx.checkpoint.deleteMany({ where: { courseId } });
-      await tx.enrollment.updateMany({
-        where: { courseId },
-        data: {
-          status: EnrollmentStatus.NOT_STARTED,
-          positionSec: 0,
-          maxReachedSec: 0,
-          watchedPercent: 0,
-          totalWatchedSec: 0,
-          videoCompleted: false,
-          attemptCount: 0,
-          bestScorePercent: null,
-          lastCorrectCount: null,
-          lastWrongCount: null,
-          passed: false,
-          firstStartedAt: null,
-          lastActivityAt: null,
-          completedAt: null,
-        },
-      });
-    }
-
-    return saved;
-  });
-
-  await recordAudit({
-    action: AuditAction.ADMIN_UPDATED_COURSE,
+  const video = await publishCourseContent({
     actor: session,
-    entityType: "Course",
-    entityId: courseId,
-    metadata: {
-      contentUploaded: true,
-      contentType,
-      contentKindChanged,
-      contentReplaced,
-      pageCount: isPdf ? requestedPageCount : null,
-      storageKey,
-      sizeBytes: file.size,
-    },
+    courseId,
+    storageKey,
+    fileName: originalName,
+    contentType,
+    durationSec: isPdf ? requestedPageCount : durationSec,
+    pageCount: isPdf ? requestedPageCount : null,
+    sizeBytes: file.size,
   });
 
   return NextResponse.json({

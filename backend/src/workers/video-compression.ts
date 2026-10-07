@@ -12,6 +12,7 @@ import { prisma } from "@/lib/prisma";
 import {
   deleteObject,
   downloadObjectToPath,
+  localObjectPath,
   uploadPathObject,
 } from "@/lib/storage";
 import {
@@ -191,13 +192,19 @@ async function processJob(job: VideoCompressionJob) {
   }
 
   const workDir = await mkdtemp(path.join(tmpdir(), "plena-video-"));
-  const inputPath = path.join(workDir, "source.mp4");
+  const localSourcePath = localObjectPath(job.sourceStorageKey);
+  const sourceExtension = path.extname(job.sourceStorageKey).toLowerCase() === ".webm"
+    ? ".webm"
+    : ".mp4";
+  const inputPath = localSourcePath || path.join(workDir, `source${sourceExtension}`);
   const outputPath = path.join(workDir, "optimized.mp4");
   const outputKey = `courses/${current.courseId}/optimized/${current.id}-v${job.mediaVersion}.mp4`;
 
   try {
     log("compression started", { jobId: job.id, videoId: current.id });
-    await downloadObjectToPath(job.sourceStorageKey, inputPath);
+    if (!localSourcePath) {
+      await downloadObjectToPath(job.sourceStorageKey, inputPath);
+    }
     const sourceProbe = await probeVideo(inputPath);
     await runFfmpeg(inputPath, outputPath);
     const outputProbe = await probeVideo(outputPath);
@@ -250,6 +257,7 @@ async function processJob(job: VideoCompressionJob) {
         },
         data: {
           storageKey: outputKey,
+          contentType: "video/mp4",
           sizeBytes: outputInfo.size,
           processingStatus: VideoProcessingStatus.OPTIMIZED,
           processingError: null,

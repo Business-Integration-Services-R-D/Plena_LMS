@@ -56,6 +56,17 @@ spec:
             periodSeconds: 20
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: shared-media
+              mountPath: {{ .Values.persistence.mountPath }}
+          {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+        - name: shared-media
+          persistentVolumeClaim:
+            claimName: {{ required "persistence.existingClaim is required when persistence is enabled" .Values.persistence.existingClaim }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

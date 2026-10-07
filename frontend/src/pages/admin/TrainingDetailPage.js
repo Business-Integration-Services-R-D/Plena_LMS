@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { api, contentUrl, fmtTime } from "@/lib/api";
 import { PageHeader } from "@/components/Layout";
 import PdfPreview from "@/components/PdfPreview";
+import { useVideoUpload } from "@/context/VideoUploadContext";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -39,6 +40,7 @@ const countPdfPages = async (file) => {
 
 export default function TrainingDetailPage() {
   const { trainingId } = useParams();
+  const { upload: videoUpload, startVideoUpload } = useVideoUpload();
   const [training, setTraining] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [questionCategories, setQuestionCategories] = useState([]);
@@ -87,6 +89,13 @@ export default function TrainingDetailPage() {
   }, [trainingId]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
+    const onUploadCompleted = (event) => {
+      if (event.detail?.courseId === trainingId) load();
+    };
+    window.addEventListener("video-upload-completed", onUploadCompleted);
+    return () => window.removeEventListener("video-upload-completed", onUploadCompleted);
+  }, [load, trainingId]);
+  useEffect(() => {
     if (!["queued", "processing"].includes(training?.video_processing_status)) return undefined;
     const timer = window.setInterval(load, 5000);
     return () => window.clearInterval(timer);
@@ -108,10 +117,15 @@ export default function TrainingDetailPage() {
       return;
     }
     const isPdfFile = file.name.toLowerCase().endsWith(".pdf") || file.type === "application/pdf";
-    const isVideoFile = file.name.toLowerCase().endsWith(".mp4") || file.type === "video/mp4";
-    if (!isPdfFile && !isVideoFile) return toast.error("Yalnızca MP4 video veya PDF yükleyebilirsiniz");
+    const lowerFileName = file.name.toLowerCase();
+    const isVideoFile =
+      lowerFileName.endsWith(".mp4") ||
+      lowerFileName.endsWith(".webm") ||
+      file.type === "video/mp4" ||
+      file.type === "video/webm";
+    if (!isPdfFile && !isVideoFile) return toast.error("Yalnızca MP4/WebM video veya PDF yükleyebilirsiniz");
     if (isPdfFile && file.size > 50 * 1024 * 1024) return toast.error("PDF 50MB sınırını aşıyor");
-    if (isVideoFile && file.size > 1024 * 1024 * 1024) return toast.error("Video 1GB sınırını aşıyor");
+    if (isVideoFile && file.size > 2_000_000_000) return toast.error("Video 2GB sınırını aşıyor");
 
     let duration = 0;
     let pageCount = 0;
@@ -127,22 +141,22 @@ export default function TrainingDetailPage() {
         v.src = URL.createObjectURL(file);
       });
     }
+    if (isVideoFile) {
+      const started = startVideoUpload({ courseId: trainingId, file, durationSec: Math.round(duration) });
+      if (started && fileRef.current) fileRef.current.value = "";
+      return;
+    }
+
     const fd = new FormData();
     fd.append("file", file);
     fd.append("duration", duration);
-    if (isPdfFile) fd.append("pageCount", pageCount);
+    fd.append("pageCount", pageCount);
     setUploading(1);
     try {
-      const result = await api.post(`/trainings/${trainingId}/video`, fd, {
+      await api.post(`/trainings/${trainingId}/video`, fd, {
         onUploadProgress: (e) => setUploading(Math.max(1, Math.round((e.loaded / e.total) * 100))),
       });
-      toast.success(
-        isPdfFile
-          ? "PDF yüklendi"
-          : result.data?.processingStatus === "QUEUED"
-            ? "Video kullanıma hazır; arka planda optimize ediliyor"
-            : "Video yüklendi",
-      );
+      toast.success("PDF yüklendi");
       load();
     } catch (e) {
       toast.error(e.response?.data?.detail || "İçerik yüklenemedi");
@@ -151,6 +165,11 @@ export default function TrainingDetailPage() {
       if (fileRef.current) fileRef.current.value = "";
     }
   };
+
+  const backgroundUploadActive =
+    videoUpload.courseId === trainingId &&
+    ["uploading", "finalizing"].includes(videoUpload.status);
+  const visibleUploadProgress = backgroundUploadActive ? videoUpload.progress : uploading;
 
   const saveCheckpoints = async (checkpoints) => {
     const res = await api.put(`/trainings/${trainingId}`, { checkpoints });
@@ -743,19 +762,21 @@ export default function TrainingDetailPage() {
               <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
                 <UploadCloud className="w-6 h-6 text-slate-400" />
               </div>
-              <p className="text-sm font-medium text-slate-700">MP4 video veya PDF yükleyin</p>
-              <p className="text-xs text-slate-400">Video 1GB · PDF 50MB</p>
+              <p className="text-sm font-medium text-slate-700">MP4/WebM video veya PDF yükleyin</p>
+              <p className="text-xs text-slate-400">Video 2GB · PDF 50MB</p>
             </button>
           )}
-          {uploading > 0 && (
+          {visibleUploadProgress > 0 && (
             <div className="mt-4">
               <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-brand-500 rounded-full transition-[width]" style={{ width: `${uploading}%` }} />
+                <div className="h-full bg-brand-500 rounded-full transition-[width]" style={{ width: `${visibleUploadProgress}%` }} />
               </div>
-              <p className="text-xs text-slate-400 mt-2">Yükleniyor... %{uploading}</p>
+              <p className="text-xs text-slate-400 mt-2">
+                {backgroundUploadActive ? "Video arka planda yükleniyor" : "Yükleniyor"}... %{visibleUploadProgress}
+              </p>
             </div>
           )}
-          <input ref={fileRef} type="file" accept="video/mp4,application/pdf,.mp4,.pdf" className="hidden" data-testid="video-file-input" onChange={(e) => uploadContent(e.target.files?.[0])} />
+          <input ref={fileRef} type="file" accept="video/mp4,video/webm,application/pdf,.mp4,.webm,.pdf" className="hidden" data-testid="video-file-input" onChange={(e) => uploadContent(e.target.files?.[0])} />
         </div>
 
         {/* CHECKPOINTS */}

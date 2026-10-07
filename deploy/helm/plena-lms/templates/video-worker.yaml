@@ -39,10 +39,19 @@ spec:
           volumeMounts:
             - name: temp
               mountPath: /tmp
+            {{- if .Values.persistence.enabled }}
+            - name: shared-media
+              mountPath: {{ .Values.persistence.mountPath }}
+            {{- end }}
       volumes:
         - name: temp
           emptyDir:
             sizeLimit: {{ .Values.videoWorker.tempStorage }}
+        {{- if .Values.persistence.enabled }}
+        - name: shared-media
+          persistentVolumeClaim:
+            claimName: {{ required "persistence.existingClaim is required when persistence is enabled" .Values.persistence.existingClaim }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

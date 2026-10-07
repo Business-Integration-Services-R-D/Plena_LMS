@@ -10,6 +10,7 @@ data:
   CORS_ALLOWED_ORIGINS: {{ .Values.config.corsAllowedOrigins | quote }}
   APP_TIMEZONE: {{ .Values.config.appTimezone | quote }}
   STORAGE_DRIVER: {{ .Values.config.storageDriver | quote }}
+  LOCAL_STORAGE_ROOT: {{ .Values.persistence.mountPath | quote }}
   AWS_REGION: {{ .Values.config.awsRegion | quote }}
   S3_BUCKET: {{ .Values.config.s3Bucket | quote }}
   EMAIL_FROM: {{ .Values.config.emailFrom | quote }}

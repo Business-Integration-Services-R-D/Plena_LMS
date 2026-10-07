@@ -19,15 +19,16 @@ PostgreSQL, repo kökündeki gömülü kurulumdan çalışır (`.tools/pg`). Ba�
 - `src/app/api/` — REST endpoint'leri (auth, admin, user)
 - `src/lib/` — domain kuralları (video/PDF ilerlemesi, sınav, aktivasyon, depolama)
 - `prisma/` — şema, migration'lar ve seed
-- `storage/videos/` — lokal modda yüklenen MP4/PDF içerikleri (gitignore)
+- `storage/videos/` — lokal modda yüklenen MP4/WebM/PDF içerikleri (gitignore)
 
 ## İçerik sınırları
 
-- MP4 video: en fazla 1 GB
+- MP4 veya WebM video: en fazla 2 GB (local/PV modunda parçalı yükleme)
 - PDF: en fazla 50 MB
 
-Production ortamında içerikler private S3 bucket'a yüklenir; lokal geliştirmede
-`STORAGE_DRIVER=local` kullanılır.
+Production ortamında içerikler S3/object storage veya ortak Persistent Volume
+üzerinde tutulabilir. Kubernetes local/PV kurulumunda backend ve video worker
+aynı RWX volume'u `LOCAL_STORAGE_ROOT` yolunda mount etmelidir.
 
 ## Testler
 

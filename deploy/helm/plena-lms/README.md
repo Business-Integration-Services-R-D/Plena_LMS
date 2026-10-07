@@ -7,8 +7,17 @@ Bu chart aşağıdaki bileşenleri kurar:
 - PostgreSQL tabanlı kuyruktan çalışan FFmpeg video worker
 - `/api` ve `/` yollarını ayıran Ingress
 
-PostgreSQL ve S3/uyumlu object storage chart dışında yönetilir. Production için
-`STORAGE_DRIVER=s3` kullanılmalıdır; backend ile worker aynı bucket'a erişmelidir.
+PostgreSQL chart dışında yönetilir. Medya depolama için iki seçenek vardır:
+
+- Eclit/Kubernetes: `STORAGE_DRIVER=local` ve backend ile worker'a aynı RWX SMB
+  Persistent Volume bağlanır.
+- Object storage: `STORAGE_DRIVER=s3` kullanılır ve backend ile worker aynı
+  bucket'a erişir.
+
+Local/PV modunda MP4/WebM videolar 16 MiB parçalarla, en fazla 2 GB olarak yüklenir.
+Yükleme uygulama içinde sayfalar arasında gezinirken devam eder. Video worker
+kaynak dosyayı doğrudan ortak volume'dan okuyarak gereksiz `/tmp` kopyasını
+oluşturmaz.
 
 ## 1. İmajları oluştur ve registry'ye gönder
 
@@ -31,8 +40,8 @@ kubectl -n plena-lms create secret generic plena-lms-secrets \
   --from-literal=RESEND_API_KEY='re_CHANGE_ME'
 ```
 
-EKS'te S3 erişimi için statik AWS anahtarı yerine IRSA service account annotation
-kullanın. Diğer Kubernetes ortamlarında gerekirse aynı Secret'a
+S3 modu kullanılıyorsa EKS'te statik AWS anahtarı yerine IRSA service account
+annotation kullanın. Diğer Kubernetes ortamlarında gerekirse aynı Secret'a
 `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_USE_SSL` ve
 `S3_FORCE_PATH_STYLE` değerleri eklenebilir.
 
@@ -44,8 +53,8 @@ kullanın. Diğer Kubernetes ortamlarında gerekirse aynı Secret'a
 cp deploy/helm/plena-lms/values-production.example.yaml values-production.yaml
 ```
 
-`values-production.yaml` içinde en az imaj, bucket, domain ve IRSA rolünü
-değiştirin. Dosyanın örnek içeriği:
+`values-production.yaml` içinde en az imaj, domain ve depolama değerlerini
+değiştirin. Eclit/RWX PVC örneği:
 
 ```yaml
 backend:
@@ -60,9 +69,14 @@ frontend:
 config:
   appUrl: https://lms.example.com
   corsAllowedOrigins: https://lms.example.com
-  awsRegion: eu-central-1
-  s3Bucket: plena-lms-files
+  storageDriver: local
+  s3Bucket: ""
   emailFrom: Plena LMS <noreply@example.com>
+
+persistence:
+  enabled: true
+  existingClaim: plena-lms-smb
+  mountPath: /app/storage/videos
 
 ingress:
   host: lms.example.com
@@ -70,10 +84,11 @@ ingress:
     enabled: true
     secretName: plena-lms-tls
 
-serviceAccount:
-  annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/plena-lms-irsa
 ```
+
+PVC `ReadWriteMany` erişim modunda olmalı ve farklı node'lardaki backend ile
+video-worker pod'ları tarafından aynı içerikle görülebilmelidir. Worker için
+varsayılan geçici alan 8 GiB'dir.
 
 ## 4. Kur
 
@@ -103,7 +118,7 @@ helm upgrade --install plena-lms dist/plena-lms-0.1.0.tgz \
   -f values-production.yaml
 ```
 
-Backend başlangıçta `prisma migrate deploy` çalıştırır. Yeni MP4 yüklenir yüklenmez
+Backend başlangıçta `prisma migrate deploy` çalıştırır. Yeni MP4/WebM yüklenir yüklenmez
 orijinal dosya aktif olur; worker H.264 720p çıktıyı hazırlayıp en az %5 küçülme
 sağlarsa DB işaretçisini atomik değiştirir. Orijinal dosya varsayılan olarak 24
 saat sonra silinir. İş başarısız olursa orijinal video aktif kalır.
