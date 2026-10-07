@@ -13,6 +13,7 @@ import {
   publishCourseContent,
 } from "@/lib/course-content-upload";
 import { prisma } from "@/lib/prisma";
+import { assertStorageQuotaAvailable, QuotaExceededError } from "@/lib/quota";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,10 +51,11 @@ export async function POST(
     manifest = await assembleVideoUpload(manifest);
     const existing = await prisma.video.findUnique({
       where: { courseId },
-      select: { storageKey: true, processingStatus: true },
+      select: { id: true, storageKey: true, processingStatus: true },
     });
     let processingStatus = existing?.processingStatus;
     if (existing?.storageKey !== manifest.storageKey) {
+      await assertStorageQuotaAvailable(manifest.totalBytes, existing?.id);
       const video = await publishCourseContent({
         actor: session,
         courseId,
@@ -74,6 +76,9 @@ export async function POST(
       processingStatus: processingStatus || "QUEUED",
     });
   } catch (error) {
+    if (error instanceof QuotaExceededError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });
+    }
     return errorResponse(error);
   }
 }

@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { requireSession } from "@/lib/auth";
 import { publishCourseContent } from "@/lib/course-content-upload";
 import { prisma } from "@/lib/prisma";
+import { assertStorageQuotaAvailable, QuotaExceededError } from "@/lib/quota";
 import {
   sanitizeStorageKeyPart,
   uploadFileObject,
@@ -74,6 +75,15 @@ export async function POST(
   }
   if (isPdf && (requestedPageCount < 1 || requestedPageCount > 5000)) {
     return NextResponse.json({ error: "PDF sayfa sayısı belirlenemedi" }, { status: 400 });
+  }
+
+  try {
+    await assertStorageQuotaAvailable(file.size, course.video?.id);
+  } catch (error) {
+    if (error instanceof QuotaExceededError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });
+    }
+    throw error;
   }
 
   const safeName = sanitizeStorageKeyPart(originalName);

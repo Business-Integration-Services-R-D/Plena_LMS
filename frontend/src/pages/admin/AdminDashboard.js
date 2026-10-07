@@ -22,9 +22,11 @@ const StatCard = ({ icon: Icon, label, value, tint, hero, testId }) => (
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
+  const [quota, setQuota] = useState(null);
 
   useEffect(() => {
     api.get("/reports/overview").then((r) => setData(r.data)).catch(() => {});
+    api.get("/quota").then((r) => setQuota(r.data)).catch(() => {});
   }, []);
 
   if (!data) {
@@ -47,6 +49,26 @@ export default function AdminDashboard() {
         <StatCard testId="stat-completed" icon={CheckCircle2} label="Tamamlanan" value={data.completed} tint="bg-emerald-50 text-emerald-600" />
         <StatCard testId="stat-completion-rate" icon={TrendingUp} label="Tamamlanma" value={`%${data.completion_rate}`} tint="bg-cyan-50 text-cyan-700" />
       </div>
+      {quota && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10" data-testid="quota-overview">
+          <QuotaCard
+            label="Kullanıcı kotası"
+            used={quota.activeUsers}
+            total={quota.maxUsers}
+            remaining={quota.remainingUsers}
+            unit="kullanıcı"
+            percent={quota.userUsagePercent}
+          />
+          <QuotaCard
+            label="Depolama kotası"
+            used={formatBytes(quota.storageUsedBytes)}
+            total={formatBytes(quota.maxStorageBytes)}
+            remaining={formatBytes(quota.remainingStorageBytes)}
+            unit=""
+            percent={quota.storageUsagePercent}
+          />
+        </div>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="n-card p-8">
           <h2 className="text-lg font-medium tracking-tight text-navy-950 mb-6">Eğitim Bazında Tamamlanma</h2>
@@ -96,6 +118,33 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function formatBytes(bytes) {
+  const gb = bytes / (1024 ** 3);
+  return `${gb.toLocaleString("tr-TR", { maximumFractionDigits: 1 })} GB`;
+}
+
+function QuotaCard({ label, used, total, remaining, unit, percent }) {
+  const tone = percent >= 95 ? "bg-red-500" : percent >= 80 ? "bg-amber-500" : "bg-cyan-500";
+  const textTone = percent >= 95 ? "text-red-600" : percent >= 80 ? "text-amber-600" : "text-slate-500";
+  return (
+    <div className="n-card p-6" data-testid={`quota-${label === "Kullanıcı kotası" ? "users" : "storage"}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium text-slate-500">{label}</p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight text-navy-950">{used} / {total}</p>
+        </div>
+        <span className={`text-sm font-semibold ${textTone}`}>%{percent}</span>
+      </div>
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full transition-[width] ${tone}`} style={{ width: `${percent}%` }} />
+      </div>
+      <p className="mt-2 text-sm text-slate-500">Kalan: <span className="font-medium text-slate-700">{remaining}{unit ? ` ${unit}` : ""}</span></p>
+      {percent >= 95 && <p className="mt-2 text-xs font-medium text-red-600">Kota dolmak üzere; yeni kayıtları kontrol edin.</p>}
+      {percent >= 80 && percent < 95 && <p className="mt-2 text-xs font-medium text-amber-600">Kota kullanımınız %80’in üzerinde.</p>}
     </div>
   );
 }

@@ -1289,6 +1289,14 @@ const routes = [
   // --- Admin: genel bakış (dashboard) ---
   {
     method: "GET",
+    pattern: /^\/quota$/,
+    handler: async () => {
+      const res = await http.get("/admin/quota");
+      return res.data;
+    },
+  },
+  {
+    method: "GET",
     pattern: /^\/reports\/overview$/,
     handler: async () => {
       const [users, courses, pools, reports] = await Promise.all([

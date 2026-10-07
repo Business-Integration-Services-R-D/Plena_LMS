@@ -11,6 +11,7 @@ import { hashPassword, requireSession } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { sendActivationEmail } from "@/lib/email";
 import { prisma } from "@/lib/prisma";
+import { assertUserQuotaAvailable, QuotaExceededError } from "@/lib/quota";
 
 export async function GET(req: NextRequest) {
   const session = await requireSession([Role.ADMIN]);
@@ -86,6 +87,9 @@ export async function POST(req: NextRequest) {
     parsed.data.password || randomBytes(32).toString("base64url"),
   );
   try {
+    if (parsed.data.role === "USER") {
+      await assertUserQuotaAvailable();
+    }
     const user = await prisma.user.create({
       data: {
         email,
@@ -169,6 +173,12 @@ export async function POST(req: NextRequest) {
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof QuotaExceededError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: 409 },
+      );
+    }
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
