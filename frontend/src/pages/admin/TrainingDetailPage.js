@@ -6,10 +6,10 @@ import PdfPreview from "@/components/PdfPreview";
 import { useVideoUpload } from "@/context/VideoUploadContext";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock, ChevronLeft, ChevronRight, ChevronsUpDown, Eye, FileText, Search } from "lucide-react";
+import { ArrowLeft, UploadCloud, Trash2, Plus, CheckCircle2, Clock, ChevronDown, ChevronLeft, ChevronRight, ChevronsUpDown, Eye, FileText, Search } from "lucide-react";
 
 const inputCls = "w-full px-4 py-2.5 rounded-xl border border-navy-900/10 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent";
 
@@ -25,6 +25,78 @@ const clampPoints = (value) => {
   return Math.min(n, MAX_TOTAL_POINTS);
 };
 const btnPrimary = "px-5 py-2.5 rounded-full bg-navy-900 text-white text-sm font-medium hover:bg-navy-800 hover:shadow-glow-cyan-sm active:scale-[0.98] transition-[background-color,transform,box-shadow] disabled:opacity-40";
+
+function QuestionPointInput({ questionId, value, ownPoints, maxAllowed, selected, onSelectQuestion, onChange, onBlur }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
+        <div className={`flex h-9 w-24 items-center overflow-hidden rounded-lg border bg-white focus-within:ring-2 focus-within:ring-brand-500 ${ownPoints > maxAllowed ? "border-red-400" : "border-navy-900/10"}`}>
+          <input
+            data-testid={`quiz-question-points-${questionId}`}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            aria-label="Soru puanı"
+            aria-expanded={open}
+            title={`En fazla ${maxAllowed} puan`}
+            className={`min-w-0 flex-1 bg-transparent px-2 py-1.5 text-right text-sm outline-none ${selected ? "text-navy-950" : "text-slate-500"}`}
+            value={value}
+            onFocus={() => {
+              onSelectQuestion();
+              setOpen(true);
+            }}
+            onChange={(event) => onChange(event.target.value.replace(/\D/g, ""))}
+            onBlur={onBlur}
+          />
+          <button
+            type="button"
+            aria-label="Hazır puanları göster"
+            aria-expanded={open}
+            onClick={() => {
+              onSelectQuestion();
+              setOpen((current) => !current);
+            }}
+            className="flex h-full w-8 shrink-0 items-center justify-center border-l border-navy-900/5 text-slate-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+          >
+            <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+        </div>
+      </PopoverAnchor>
+      <PopoverContent
+        align="end"
+        sideOffset={6}
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        className="z-[70] w-24 rounded-xl border-navy-900/10 bg-white p-1.5 text-navy-950 shadow-[0_18px_45px_-18px_rgba(14,32,51,0.28)]"
+      >
+        {PASS_SCORE_OPTIONS.map((points) => {
+          const disabled = points > maxAllowed;
+          return (
+            <button
+              key={points}
+              type="button"
+              disabled={disabled}
+              onClick={() => {
+                onSelectQuestion();
+                onChange(String(points));
+                setOpen(false);
+              }}
+              className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                disabled
+                  ? "cursor-not-allowed text-slate-300"
+                  : "cursor-pointer text-navy-950 hover:bg-brand-50 focus:bg-brand-50 focus:outline-none"
+              }`}
+            >
+              <span>{points}</span>
+              {ownPoints === points && selected && <CheckCircle2 className="h-4 w-4 text-brand-600" />}
+            </button>
+          );
+        })}
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 // PDF sayfa ağacındaki en yüksek /Count değeri toplam sayfa sayısıdır.
 // Yönetici yüklemesinde tarayıcıda hesaplanır, sunucuya da sınır kontrolüyle iletilir.
@@ -81,6 +153,7 @@ export default function TrainingDetailPage() {
   const [bankQuestionSaving, setBankQuestionSaving] = useState(false);
   const fileRef = useRef(null);
   const previewRef = useRef(null);
+  const initializedQuizTrainingRef = useRef(null);
 
   const load = useCallback(() => {
     api.get(`/trainings/${trainingId}`).then((r) => setTraining(r.data));
@@ -101,6 +174,8 @@ export default function TrainingDetailPage() {
     return () => window.clearInterval(timer);
   }, [load, training?.video_processing_status]);
   useEffect(() => {
+    if (!training || initializedQuizTrainingRef.current === training.training_id) return;
+    initializedQuizTrainingRef.current = training.training_id;
     setSelectedIds(training?.quiz?.question_ids || []);
     setPassEnabled(training?.quiz?.pass_score != null);
     setScoringMode(training?.quiz?.scoring_mode || "auto");
@@ -347,22 +422,61 @@ export default function TrainingDetailPage() {
     setSelectedIds((prev) => (prev.includes(qid) ? prev.filter((x) => x !== qid) : [...prev, qid]));
   };
 
+  // Puan alanı doğrudan kullanılabilir olmalı; alana odaklanmak soruyu sınava da ekler.
+  const selectQuizQuestionForScoring = (qid) => {
+    setSelectedIds((current) => {
+      if (current.includes(qid)) return current;
+
+      // Mevcut sorular puanlandıysa yeni/son soru kalan puanı otomatik alır.
+      if (current.length > 0) {
+        setQuestionPoints((points) => {
+          const allocated = current.reduce((sum, id) => sum + clampPoints(points[id]), 0);
+          const remaining = MAX_TOTAL_POINTS - allocated;
+          return remaining > 0 ? { ...points, [qid]: remaining } : points;
+        });
+      }
+      return [...current, qid];
+    });
+  };
+
   // Sorunun puanı, diğer soruların toplamıyla birlikte 100'ü geçemez.
   const setQuestionPoint = (qid, value, maxAllowed) => {
     const n = Math.round(Number(value));
+    let nextValue = value;
     if (Number.isFinite(n) && n > maxAllowed) {
       toast.error(
         maxAllowed > 0
           ? `Toplam puan ${MAX_TOTAL_POINTS} olabilir; bu soruya en fazla ${maxAllowed} puan verebilirsiniz.`
           : `Toplam puan ${MAX_TOTAL_POINTS}'e ulaştı; önce diğer soruların puanını düşürün.`,
       );
-      setQuestionPoints((prev) => ({ ...prev, [qid]: Math.max(1, maxAllowed) }));
-      return;
+      nextValue = Math.max(1, maxAllowed);
     }
-    setQuestionPoints((prev) => ({ ...prev, [qid]: value }));
+    setQuestionPoints((prev) => {
+      const next = { ...prev, [qid]: nextValue };
+      // Son seçili soru dengeleme sorusudur; diğer puanlar değiştikçe
+      // toplamı 100'e tamamlayan kalan puanı otomatik alır.
+      const remainingId = selectedIds[selectedIds.length - 1];
+      if (
+        Number.isFinite(Number(nextValue)) &&
+        Number(nextValue) > 0 &&
+        selectedIds.length > 1 &&
+        remainingId !== qid
+      ) {
+        const allocated = selectedIds
+          .filter((id) => id !== remainingId)
+          .reduce((sum, id) => sum + clampPoints(next[id]), 0);
+        const remaining = MAX_TOTAL_POINTS - allocated;
+        if (remaining > 0) next[remainingId] = remaining;
+      }
+      return next;
+    });
   };
 
   const saveQuizQuestions = async () => {
+    if (scoringMode === "per_question" && selectedIds.length > 0 && totalPoints !== MAX_TOTAL_POINTS) {
+      toast.error(`Soru puanlarının toplamı ${MAX_TOTAL_POINTS} olmalıdır.`);
+      return;
+    }
     setSavingQuiz(true);
     try {
       // Yalnızca soru listesi ve puanlama gönderilir; geçme notu ayrı akışta güncellenir.
@@ -412,6 +526,8 @@ export default function TrainingDetailPage() {
     0,
   );
   const pointsOverLimit = scoringMode === "per_question" && totalPoints > MAX_TOTAL_POINTS;
+  const pointsUnderLimit = scoringMode === "per_question" && selectedIds.length > 0 && totalPoints < MAX_TOTAL_POINTS;
+  const pointsTotalInvalid = pointsOverLimit || pointsUnderLimit;
   const normalizedQuestionSearch = quizQuestionSearch.trim().toLocaleLowerCase("tr-TR");
   const filteredQuizQuestions = questions.filter((question) => {
     const matchesCategory =
@@ -468,8 +584,21 @@ export default function TrainingDetailPage() {
                     ? "border-red-200 bg-red-50 text-red-900"
                     : "border-slate-200 bg-slate-50 text-slate-700"
             }`} data-testid="video-processing-status">
-              {training.video_processing_status === "queued" && "Video kullanıma hazır. Sıkıştırma kuyruğunda bekliyor."}
-              {training.video_processing_status === "processing" && "Video kullanıma hazır. Arka planda sıkıştırılıyor."}
+              {training.video_processing_status === "queued" && "Video kullanıma hazır. Sıkıştırma kuyruğunda bekliyor (%0)."}
+              {training.video_processing_status === "processing" && (
+                <div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span>Video kullanıma hazır. Arka planda sıkıştırılıyor.</span>
+                    <span className="font-semibold">%{training.video_processing_progress || 0}</span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-amber-100">
+                    <div
+                      className="h-full rounded-full bg-amber-500 transition-[width]"
+                      style={{ width: `${training.video_processing_progress || 0}%` }}
+                    />
+                  </div>
+                </div>
+              )}
               {training.video_processing_status === "optimized" && (
                 <span>
                   Video optimize edildi: {formatMb(training.video_source_size)} → {formatMb(training.video_size)}
@@ -708,22 +837,60 @@ export default function TrainingDetailPage() {
                   {/* Serbest metinde yanlış cevap yoktur; yalnızca süre aşımı başarısızlık sayılır. */}
                   {cpSelectedIsFreeText ? (
                     cpInline.has_timeout ? (
-                      <select data-testid="cp-preview-onfail-select" className={inputCls} value={cpInline.on_fail} onChange={(e) => setCpInline({ ...cpInline, on_fail: e.target.value })}>
-                        <option value="start">Süre dolarsa: Başa dön</option>
-                        <option value="previous">Süre dolarsa: Önceki nokta</option>
-                      </select>
+                      <Select value={cpInline.on_fail} onValueChange={(value) => setCpInline({ ...cpInline, on_fail: value })}>
+                        <SelectTrigger
+                          data-testid="cp-preview-onfail-select"
+                          aria-label="Süre dolduğunda yapılacak işlem"
+                          className="h-[42px] w-full rounded-xl border-navy-900/10 bg-white px-4 text-sm font-medium text-navy-950 shadow-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-0"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent
+                          position="popper"
+                          sideOffset={6}
+                          className="z-[70] rounded-xl border-navy-900/10 bg-white p-1.5 text-navy-950 shadow-[0_18px_45px_-18px_rgba(14,32,51,0.28)]"
+                        >
+                          <SelectItem value="start" className="rounded-lg py-2.5 pl-3 pr-9 text-sm font-medium cursor-pointer focus:bg-brand-50 focus:text-navy-950">
+                            Süre dolarsa: Başa dön
+                          </SelectItem>
+                          <SelectItem value="previous" className="rounded-lg py-2.5 pl-3 pr-9 text-sm font-medium cursor-pointer focus:bg-brand-50 focus:text-navy-950">
+                            Süre dolarsa: Önceki nokta
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     ) : (
                       <p className="px-3 py-2 rounded-lg text-xs text-slate-500 bg-white border border-navy-900/10">
                         Süre sınırı olmadığı için başarısızlık durumu yoktur; kullanıcı cevabını yazana kadar içerik devam etmez.
                       </p>
                     )
                   ) : (
-                    <select data-testid="cp-preview-onfail-select" className={inputCls} value={cpInline.on_fail} onChange={(e) => setCpInline({ ...cpInline, on_fail: e.target.value })}>
-                      <option value="start">Başarısızsa: Başa dön</option>
-                      <option value="previous">Başarısızsa: Önceki nokta</option>
-                      <option value="retry_limited">Başarısızsa: Deneme hakkı olsun</option>
-                      <option value="retry">Başarısızsa: Doğru yapana kadar deneyebilsin</option>
-                    </select>
+                    <Select value={cpInline.on_fail} onValueChange={(value) => setCpInline({ ...cpInline, on_fail: value })}>
+                      <SelectTrigger
+                        data-testid="cp-preview-onfail-select"
+                        aria-label="Başarısız cevapta yapılacak işlem"
+                        className="h-[42px] w-full rounded-xl border-navy-900/10 bg-white px-4 text-sm font-medium text-navy-950 shadow-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-0"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent
+                        position="popper"
+                        sideOffset={6}
+                        className="z-[70] rounded-xl border-navy-900/10 bg-white p-1.5 text-navy-950 shadow-[0_18px_45px_-18px_rgba(14,32,51,0.28)]"
+                      >
+                        <SelectItem value="start" className="rounded-lg py-2.5 pl-3 pr-9 text-sm font-medium cursor-pointer focus:bg-brand-50 focus:text-navy-950">
+                          Başarısızsa: Başa dön
+                        </SelectItem>
+                        <SelectItem value="previous" className="rounded-lg py-2.5 pl-3 pr-9 text-sm font-medium cursor-pointer focus:bg-brand-50 focus:text-navy-950">
+                          Başarısızsa: Önceki nokta
+                        </SelectItem>
+                        <SelectItem value="retry_limited" className="rounded-lg py-2.5 pl-3 pr-9 text-sm font-medium cursor-pointer focus:bg-brand-50 focus:text-navy-950">
+                          Başarısızsa: Deneme hakkı olsun
+                        </SelectItem>
+                        <SelectItem value="retry" className="rounded-lg py-2.5 pl-3 pr-9 text-sm font-medium cursor-pointer focus:bg-brand-50 focus:text-navy-950">
+                          Başarısızsa: Doğru yapana kadar deneyebilsin
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   )}
                   {!cpSelectedIsFreeText && cpInline.on_fail === "retry_limited" && (
                     <div className="space-y-3 fade-up">
@@ -733,15 +900,30 @@ export default function TrainingDetailPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-slate-500 whitespace-nowrap">Haklar bitince:</span>
-                        <select
-                          data-testid="cp-preview-retry-exhausted-select"
-                          className={inputCls}
+                        <Select
                           value={cpInline.retry_exhausted}
-                          onChange={(e) => setCpInline({ ...cpInline, retry_exhausted: e.target.value })}
+                          onValueChange={(value) => setCpInline({ ...cpInline, retry_exhausted: value })}
                         >
-                          <option value="start">{isPdf ? "PDF başa dönsün" : "Video başa dönsün"}</option>
-                          <option value="previous">Bir önceki kontrol noktasına dönsün</option>
-                        </select>
+                          <SelectTrigger
+                            data-testid="cp-preview-retry-exhausted-select"
+                            aria-label="Deneme hakları bittiğinde yapılacak işlem"
+                            className="h-[42px] min-w-0 flex-1 rounded-xl border-navy-900/10 bg-white px-4 text-sm font-medium text-navy-950 shadow-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-0"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent
+                            position="popper"
+                            sideOffset={6}
+                            className="z-[70] rounded-xl border-navy-900/10 bg-white p-1.5 text-navy-950 shadow-[0_18px_45px_-18px_rgba(14,32,51,0.28)]"
+                          >
+                            <SelectItem value="start" className="rounded-lg py-2.5 pl-3 pr-9 text-sm font-medium cursor-pointer focus:bg-brand-50 focus:text-navy-950">
+                              {isPdf ? "PDF başa dönsün" : "Video başa dönsün"}
+                            </SelectItem>
+                            <SelectItem value="previous" className="rounded-lg py-2.5 pl-3 pr-9 text-sm font-medium cursor-pointer focus:bg-brand-50 focus:text-navy-950">
+                              Bir önceki kontrol noktasına dönsün
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   )}
@@ -816,7 +998,7 @@ export default function TrainingDetailPage() {
               <p className="text-sm text-slate-400">
                 Soru havuzundan sınava soru seçin. {selectedIds.length} soru seçildi
                 {scoringMode === "per_question" && selectedIds.length > 0 && (
-                  <span className={pointsOverLimit ? "text-red-500 font-medium" : ""} data-testid="quiz-total-points">
+                  <span className={pointsTotalInvalid ? "text-red-500 font-medium" : "text-emerald-600 font-medium"} data-testid="quiz-total-points">
                     {" "}· toplam {totalPoints} / {MAX_TOTAL_POINTS} puan
                   </span>
                 )}.
@@ -885,15 +1067,36 @@ export default function TrainingDetailPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-slate-500 whitespace-nowrap">Puanlama:</span>
-                <select
-                  data-testid="quiz-scoring-mode-select"
-                  className={inputCls + " w-auto pr-9"}
+                <Select
                   value={scoringMode}
-                  onChange={(e) => setScoringMode(e.target.value)}
+                  onValueChange={setScoringMode}
                 >
-                  <option value="auto">Otomatik — her soru eşit</option>
-                  <option value="per_question">Soru başına puan</option>
-                </select>
+                  <SelectTrigger
+                    data-testid="quiz-scoring-mode-select"
+                    aria-label="Puanlama yöntemi"
+                    className="h-[42px] w-[min(17rem,calc(100vw-7rem))] rounded-xl border-navy-900/10 bg-white px-4 text-sm font-medium text-navy-950 shadow-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-0"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent
+                    position="popper"
+                    sideOffset={6}
+                    className="z-[70] rounded-xl border-navy-900/10 bg-white p-1.5 text-navy-950 shadow-[0_18px_45px_-18px_rgba(14,32,51,0.28)]"
+                  >
+                    <SelectItem
+                      value="auto"
+                      className="rounded-lg py-2.5 pl-3 pr-9 text-sm font-medium cursor-pointer focus:bg-brand-50 focus:text-navy-950"
+                    >
+                      Otomatik — her soru eşit
+                    </SelectItem>
+                    <SelectItem
+                      value="per_question"
+                      className="rounded-lg py-2.5 pl-3 pr-9 text-sm font-medium cursor-pointer focus:bg-brand-50 focus:text-navy-950"
+                    >
+                      Soru başına puan
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <label className="flex items-center gap-2 text-sm text-slate-500 cursor-pointer select-none">
                 <input
@@ -981,9 +1184,21 @@ export default function TrainingDetailPage() {
             )}
             {filteredQuizQuestions.map((q) => {
               const selected = selectedIds.includes(q.question_id);
-              // Bu soruya verilebilecek en yüksek puan = 100 - diğer soruların toplamı.
               const ownPoints = clampPoints(questionPoints[q.question_id]);
-              const maxAllowed = Math.max(0, MAX_TOTAL_POINTS - (totalPoints - ownPoints));
+              const balancingQuestionId = selectedIds[selectedIds.length - 1];
+              // Son seçili soru kalan puanı otomatik aldığı için diğer sorular,
+              // ona en az 1 puan bırakacak şekilde serbestçe artırılabilir.
+              const fixedOtherPoints = selectedIds
+                .filter((id) => id !== q.question_id && id !== balancingQuestionId)
+                .reduce((sum, id) => sum + clampPoints(questionPoints[id]), 0);
+              const maxAllowed = Math.max(
+                0,
+                !selected
+                  ? MAX_TOTAL_POINTS - totalPoints
+                  : q.question_id === balancingQuestionId
+                    ? MAX_TOTAL_POINTS - (totalPoints - ownPoints)
+                    : MAX_TOTAL_POINTS - fixedOtherPoints - 1,
+              );
               return (
                 <div
                   key={q.question_id}
@@ -1009,19 +1224,20 @@ export default function TrainingDetailPage() {
                   </button>
                   <span className="text-xs text-amber-700 whitespace-nowrap">{q.category || "Kategorisiz"}</span>
                   <span className="text-xs text-slate-400 whitespace-nowrap">{q.qtype === "multiple_choice" ? "Seçmeli" : "Metin"}</span>
-                  {scoringMode === "per_question" && selected && (
+                  {scoringMode === "per_question" && (
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <input
-                        data-testid={`quiz-question-points-${q.question_id}`}
-                        type="number"
-                        min="1"
-                        max={maxAllowed}
-                        aria-label="Soru puanı"
-                        title={`En fazla ${maxAllowed} puan`}
-                        className={`w-16 px-2 py-1.5 rounded-lg border bg-white text-sm text-right focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent ${ownPoints > maxAllowed ? "border-red-400" : "border-navy-900/10"}`}
+                      <QuestionPointInput
+                        questionId={q.question_id}
                         value={questionPoints[q.question_id] ?? 1}
-                        onChange={(e) => setQuestionPoint(q.question_id, e.target.value, maxAllowed)}
-                        onBlur={(e) => setQuestionPoint(q.question_id, clampPoints(e.target.value), maxAllowed)}
+                        ownPoints={ownPoints}
+                        maxAllowed={maxAllowed}
+                        selected={selected}
+                        onSelectQuestion={() => selectQuizQuestionForScoring(q.question_id)}
+                        onChange={(value) => {
+                          selectQuizQuestionForScoring(q.question_id);
+                          setQuestionPoint(q.question_id, value, maxAllowed);
+                        }}
+                        onBlur={(event) => setQuestionPoint(q.question_id, clampPoints(event.target.value), maxAllowed)}
                       />
                       <span className="text-xs text-slate-400">puan</span>
                     </div>
@@ -1032,17 +1248,19 @@ export default function TrainingDetailPage() {
           </div>
           {questions.length > 0 && (
             <div className="flex items-center justify-between gap-4 flex-wrap mt-6">
-              <p className={`text-xs ${pointsOverLimit ? "text-red-500" : "text-slate-400"}`}>
+              <p className={`text-xs ${pointsTotalInvalid ? "text-red-500" : "text-slate-400"}`}>
                 {pointsOverLimit
-                  ? `Soru puanlarının toplamı ${totalPoints}. Kaydetmek için toplamı ${MAX_TOTAL_POINTS} veya altına indirin.`
+                  ? `Toplam ${totalPoints} puan. Kaydetmek için ${totalPoints - MAX_TOTAL_POINTS} puan azaltın.`
+                  : pointsUnderLimit
+                    ? `Toplam ${totalPoints} puan. Kaydetmek için kalan ${MAX_TOTAL_POINTS - totalPoints} puanı sorulara dağıtın.`
                   : scoringMode === "per_question"
-                    ? `Puanların toplamı en fazla ${MAX_TOTAL_POINTS} olabilir. Serbest metin sorularda boş olmayan cevap sorunun tam puanını alır.`
+                    ? `Puan dağılımı tamamlandı. Soruların toplamı ${MAX_TOTAL_POINTS} puan.`
                     : "Çoktan seçmeli ve serbest metin sorular eşit ağırlıkta değerlendirilir."}
               </p>
               <button
                 data-testid="quiz-save-questions-btn"
                 className={btnPrimary}
-                disabled={savingQuiz || !quizDirty || pointsOverLimit}
+                disabled={savingQuiz || !quizDirty || pointsTotalInvalid}
                 onClick={saveQuizQuestions}
               >
                 <span className="flex items-center gap-2">
