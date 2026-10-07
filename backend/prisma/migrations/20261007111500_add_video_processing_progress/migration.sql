@@ -1,0 +1,2 @@
+ALTER TABLE "Video"
+ADD COLUMN "processingProgress" INTEGER NOT NULL DEFAULT 0;

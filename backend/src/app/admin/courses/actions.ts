@@ -6,6 +6,7 @@ import { requireSession } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { prisma } from "@/lib/prisma";
 import { sanitizeStorageKeyPart, uploadFileObject } from "@/lib/storage";
+import { assertStorageQuotaAvailable, QuotaExceededError } from "@/lib/quota";
 
 function parseRetakePolicy(value: FormDataEntryValue | null): RetakePolicy {
   return value === RetakePolicy.VIDEO_AND_TEST
@@ -45,11 +46,17 @@ export async function createCourseAction(
     if (!Number.isFinite(passPercent) || passPercent < 0 || passPercent > 100) {
       return { ok: false, error: "Geçme barajı 0-100 arasında olmalı" };
     }
-    if (file.size > 1024 * 1024 * 1024) {
+    if (file.size > 2_000_000_000) {
       return {
         ok: false,
-        error: "Video çok büyük (max 1GB). Daha kısa bir dosya deneyin.",
+        error: "Video çok büyük (max 2GB). Daha kısa bir dosya deneyin.",
       };
+    }
+    try {
+      await assertStorageQuotaAvailable(file.size);
+    } catch (error) {
+      if (error instanceof QuotaExceededError) return { ok: false, error: error.message };
+      throw error;
     }
 
     const originalName =

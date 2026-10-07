@@ -415,6 +415,7 @@ model Video {
   sizeBytes        Int                   @default(0)
   sourceSizeBytes  Int?
   processingStatus VideoProcessingStatus @default(READY)
+  processingProgress Int                   @default(0)
   processingError  String?
   mediaVersion     Int                   @default(1)
   createdAt        DateTime              @default(now())

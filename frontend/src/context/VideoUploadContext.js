@@ -4,7 +4,7 @@ import { AlertCircle, CheckCircle2, UploadCloud, X } from "lucide-react";
 import { toast } from "sonner";
 import { http } from "@/lib/api";
 
-const LEGACY_MAX_BYTES = 1024 * 1024 * 1024;
+const LEGACY_MAX_BYTES = 2_000_000_000;
 const initialUpload = {
   status: "idle",
   courseId: null,

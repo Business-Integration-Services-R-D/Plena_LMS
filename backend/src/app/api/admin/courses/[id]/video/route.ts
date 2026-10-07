@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { requireSession } from "@/lib/auth";
 import { publishCourseContent } from "@/lib/course-content-upload";
 import { prisma } from "@/lib/prisma";
+import { assertStorageQuotaAvailable, QuotaExceededError } from "@/lib/quota";
 import {
   sanitizeStorageKeyPart,
   uploadFileObject,
@@ -62,10 +63,10 @@ export async function POST(
     );
   }
 
-  const maxBytes = isPdf ? 50 * 1024 * 1024 : 1024 * 1024 * 1024;
+  const maxBytes = isPdf ? 50 * 1024 * 1024 : 2_000_000_000;
   if (file.size > maxBytes) {
     return NextResponse.json(
-      { error: isPdf ? "PDF çok büyük (max 50MB)" : "Video çok büyük (max 1GB)" },
+      { error: isPdf ? "PDF çok büyük (max 50MB)" : "Video çok büyük (max 2GB)" },
       { status: 413 },
     );
   }
@@ -74,6 +75,15 @@ export async function POST(
   }
   if (isPdf && (requestedPageCount < 1 || requestedPageCount > 5000)) {
     return NextResponse.json({ error: "PDF sayfa sayısı belirlenemedi" }, { status: 400 });
+  }
+
+  try {
+    await assertStorageQuotaAvailable(file.size, course.video?.id);
+  } catch (error) {
+    if (error instanceof QuotaExceededError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });
+    }
+    throw error;
   }
 
   const safeName = sanitizeStorageKeyPart(originalName);

@@ -47,6 +47,7 @@ export async function publishCourseContent(input: {
       processingStatus: isPdf
         ? VideoProcessingStatus.READY
         : VideoProcessingStatus.QUEUED,
+      processingProgress: isPdf ? 100 : 0,
       processingError: null,
       mediaVersion,
     };

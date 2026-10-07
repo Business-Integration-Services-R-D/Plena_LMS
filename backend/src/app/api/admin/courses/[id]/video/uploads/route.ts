@@ -6,6 +6,7 @@ import {
   VideoUploadError,
 } from "@/lib/chunked-video-upload";
 import { prisma } from "@/lib/prisma";
+import { assertStorageQuotaAvailable, QuotaExceededError } from "@/lib/quota";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +42,11 @@ export async function POST(
   }
 
   try {
+    const existing = await prisma.video.findUnique({
+      where: { courseId },
+      select: { id: true },
+    });
+    await assertStorageQuotaAvailable(Number(body.fileSize), existing?.id);
     const upload = await createVideoUpload({
       courseId,
       ownerId: session.id,
@@ -55,6 +61,9 @@ export async function POST(
       maxBytes: 2_000_000_000,
     });
   } catch (error) {
+    if (error instanceof QuotaExceededError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: 409 });
+    }
     return errorResponse(error);
   }
 }

@@ -124,6 +124,7 @@ const mapCourse = (c) => ({
   video_size: c.video?.sizeBytes || 0,
   video_source_size: c.video?.sourceSizeBytes || c.video?.sizeBytes || 0,
   video_processing_status: c.video?.processingStatus?.toLowerCase() || null,
+  video_processing_progress: c.video?.processingProgress || 0,
   video_processing_error: c.video?.processingError || null,
   content_type: c.video?.pageCount ? "pdf" : c.video ? "video" : null,
   pdf_page_count: c.video?.pageCount || 0,
@@ -1287,6 +1288,14 @@ const routes = [
   },
 
   // --- Admin: genel bakış (dashboard) ---
+  {
+    method: "GET",
+    pattern: /^\/quota$/,
+    handler: async () => {
+      const res = await http.get("/admin/quota");
+      return res.data;
+    },
+  },
   {
     method: "GET",
     pattern: /^\/reports\/overview$/,
