@@ -127,7 +127,7 @@ export default function WatchPage() {
 
   return (
     <div
-      className={`fade-up ${training.content_type === "pdf" ? "w-full max-w-none" : "max-w-4xl"}`}
+      className="fade-up mx-auto w-full max-w-[1440px]"
       data-testid="watch-page"
     >
       <Link to="/trainings" data-testid="back-to-my-trainings" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-navy-950 mb-6 transition-colors">

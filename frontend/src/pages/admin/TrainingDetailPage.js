@@ -504,16 +504,18 @@ export default function TrainingDetailPage() {
                 </div>
               ) : (
                 <>
-                  <video
-                    ref={previewRef}
-                    src={contentUrl(training.training_id)}
-                    controls
-                    className="w-full rounded-xl bg-black"
-                    data-testid="admin-video-preview"
-                    onTimeUpdate={() => setPreviewTime(previewRef.current?.currentTime || 0)}
-                    onPause={() => setPreviewPaused(true)}
-                    onPlay={() => setPreviewPaused(false)}
-                  />
+                  <div className="aspect-video overflow-hidden rounded-xl bg-black">
+                    <video
+                      ref={previewRef}
+                      src={contentUrl(training.training_id)}
+                      controls
+                      className="block h-full w-full object-contain"
+                      data-testid="admin-video-preview"
+                      onTimeUpdate={() => setPreviewTime(previewRef.current?.currentTime || 0)}
+                      onPause={() => setPreviewPaused(true)}
+                      onPlay={() => setPreviewPaused(false)}
+                    />
+                  </div>
 
                   {/* Kontrol noktası şeridi: sarı işaretlere tıklayınca o ana gider */}
                   {(training.checkpoints || []).length > 0 && training.duration > 0 && (
