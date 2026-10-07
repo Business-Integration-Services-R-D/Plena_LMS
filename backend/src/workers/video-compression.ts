@@ -1,4 +1,4 @@
-import { execFile } from "child_process";
+import { execFile, spawn } from "child_process";
 import { mkdtemp, rm, stat } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
@@ -88,10 +88,53 @@ async function probeVideo(filePath: string): Promise<VideoProbe> {
   };
 }
 
-async function runFfmpeg(inputPath: string, outputPath: string) {
+async function runFfmpeg(
+  inputPath: string,
+  outputPath: string,
+  durationSec: number,
+  onProgress: (percent: number) => void,
+) {
   const config = compressionConfig();
-  await execFileAsync("ffmpeg", ffmpegArgs(inputPath, outputPath, config), {
-    maxBuffer: 16 * 1024 * 1024,
+  const args = ffmpegArgs(inputPath, outputPath, config);
+  args.splice(args.length - 1, 0, "-progress", "pipe:1", "-nostats");
+
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn("ffmpeg", args, { stdio: ["ignore", "pipe", "pipe"] });
+    let stdoutBuffer = "";
+    let stderr = "";
+    let lastPercent = -1;
+
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => {
+      stdoutBuffer += chunk;
+      const lines = stdoutBuffer.split(/\r?\n/);
+      stdoutBuffer = lines.pop() || "";
+      for (const line of lines) {
+        const [key, rawValue] = line.split("=", 2);
+        if (key === "progress" && rawValue === "end") {
+          if (lastPercent !== 100) onProgress(100);
+          lastPercent = 100;
+          continue;
+        }
+        if (key !== "out_time_us" && key !== "out_time_ms") continue;
+        const processedSeconds = Number(rawValue) / 1_000_000;
+        if (!Number.isFinite(processedSeconds) || durationSec <= 0) continue;
+        const percent = Math.max(1, Math.min(99, Math.floor((processedSeconds / durationSec) * 100)));
+        if (percent > lastPercent) {
+          lastPercent = percent;
+          onProgress(percent);
+        }
+      }
+    });
+    child.stderr.setEncoding("utf8");
+    child.stderr.on("data", (chunk: string) => {
+      stderr = (stderr + chunk).slice(-16 * 1024);
+    });
+    child.once("error", reject);
+    child.once("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`ffmpeg kod ${code}: ${stderr.trim()}`));
+    });
   });
 }
 
@@ -162,7 +205,10 @@ async function claimJob(): Promise<VideoCompressionJob | null> {
       mediaVersion: job.mediaVersion,
       storageKey: job.sourceStorageKey,
     },
-    data: { processingStatus: VideoProcessingStatus.PROCESSING },
+    data: {
+      processingStatus: VideoProcessingStatus.PROCESSING,
+      processingProgress: 0,
+    },
   });
   return job;
 }
@@ -206,7 +252,23 @@ async function processJob(job: VideoCompressionJob) {
       await downloadObjectToPath(job.sourceStorageKey, inputPath);
     }
     const sourceProbe = await probeVideo(inputPath);
-    await runFfmpeg(inputPath, outputPath);
+    let progressWrites = Promise.resolve();
+    let lastPersistedPercent = 0;
+    await runFfmpeg(inputPath, outputPath, sourceProbe.durationSec, (percent) => {
+      if (percent < 100 && percent - lastPersistedPercent < 2) return;
+      lastPersistedPercent = percent;
+      progressWrites = progressWrites.then(async () => {
+        await prisma.video.updateMany({
+          where: {
+            id: job.videoId,
+            mediaVersion: job.mediaVersion,
+            storageKey: job.sourceStorageKey,
+          },
+          data: { processingProgress: percent },
+        });
+      });
+    });
+    await progressWrites;
     const outputProbe = await probeVideo(outputPath);
     const outputInfo = await stat(outputPath);
 
@@ -235,6 +297,7 @@ async function processJob(job: VideoCompressionJob) {
           },
           data: {
             processingStatus: VideoProcessingStatus.SKIPPED,
+            processingProgress: 100,
             processingError: null,
           },
         }),
@@ -260,6 +323,7 @@ async function processJob(job: VideoCompressionJob) {
           contentType: "video/mp4",
           sizeBytes: outputInfo.size,
           processingStatus: VideoProcessingStatus.OPTIMIZED,
+          processingProgress: 100,
           processingError: null,
         },
       });
@@ -324,6 +388,7 @@ async function failJob(job: VideoCompressionJob, error: unknown) {
         processingStatus: retry
           ? VideoProcessingStatus.QUEUED
           : VideoProcessingStatus.FAILED,
+        processingProgress: retry ? 0 : undefined,
         processingError: message,
       },
     }),
