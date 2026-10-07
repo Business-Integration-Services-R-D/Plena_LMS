@@ -127,7 +127,7 @@ export default function WatchPage() {
 
   return (
     <div
-      className="fade-up w-full max-w-none"
+      className="fade-up mx-auto w-full max-w-7xl"
       data-testid="watch-page"
     >
       <Link to="/trainings" data-testid="back-to-my-trainings" className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-navy-950 mb-6 transition-colors">
