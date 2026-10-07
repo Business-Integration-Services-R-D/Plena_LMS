@@ -297,13 +297,13 @@ export default function VideoPlayer({ trainingId, duration, checkpoints, initial
   return (
     <div
       ref={playerRef}
-      className={`relative overflow-hidden bg-black shadow-[0_20px_60px_rgba(14,32,51,0.18)] ${isFallbackFullscreen ? "fixed inset-0 z-[100] flex h-[100dvh] items-center rounded-none" : isFullscreen ? "flex h-[100dvh] items-center rounded-none" : "rounded-2xl"}`}
+      className={`relative overflow-hidden bg-black shadow-[0_20px_60px_rgba(14,32,51,0.18)] ${isFallbackFullscreen ? "fixed inset-0 z-[100] flex h-[100dvh] items-center rounded-none" : isFullscreen ? "flex h-[100dvh] items-center rounded-none" : "aspect-video rounded-2xl"}`}
       data-testid="video-player"
     >
       <video
         ref={videoRef}
         src={videoUrl(trainingId)}
-        className="w-full max-h-full block"
+        className="block h-full w-full object-contain"
         onTimeUpdate={handleTimeUpdate}
         onSeeking={handleSeeking}
         onEnded={handleEnded}
